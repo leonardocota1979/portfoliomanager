@@ -16,7 +16,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Importa módulos do app
-from .database import create_db_and_tables, SessionLocal
+from .database import create_db_and_tables, SessionLocal, GlobalAssetClass
 from . import crud, schemas
 from .services.price_service import get_price_service
 
@@ -39,6 +39,29 @@ load_dotenv()
 
 # Cria tabelas do banco de dados ao iniciar
 create_db_and_tables()
+
+# Seed global asset classes if empty
+def _seed_global_classes():
+    defaults = [
+        ("Stocks", "Equities/Shares - Ações de empresas"),
+        ("Bonds", "Fixed Income - Títulos de renda fixa"),
+        ("REITs", "Real Estate Investment Trusts - Fundos Imobiliários"),
+        ("Crypto", "Cryptocurrencies - Criptomoedas e ativos digitais"),
+        ("Commodities", "Raw materials - Ouro, prata, petróleo, etc"),
+        ("Reserva de Valor", "Reserva de valor - Caixa e equivalentes"),
+    ]
+    db = SessionLocal()
+    try:
+        existing = db.query(GlobalAssetClass).count()
+        if existing > 0:
+            return
+        for name, desc in defaults:
+            db.add(GlobalAssetClass(name=name, description=desc))
+        db.commit()
+    finally:
+        db.close()
+
+_seed_global_classes()
 
 # Bootstrap admin user from env (only if not exists)
 def _bootstrap_admin():

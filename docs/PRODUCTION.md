@@ -39,6 +39,10 @@ sqlite:////var/data/portfoliomanager.db
 **Profissional (Postgres)**  
 Crie um Postgres no Render e substitua `DATABASE_URL`.
 
+### 4.1) Seed automático de classes globais
+No primeiro boot, o sistema cria classes globais padrão automaticamente
+(Stocks, Bonds, REITs, Crypto, Commodities, Reserva de Valor).
+
 ### 5) Deploy
 Finalize o deploy e acesse a URL pública fornecida pelo Render.
 
