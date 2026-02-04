@@ -1,0 +1,173 @@
+<!-- app/templates/portfolio_list.html -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 font-sans">
+    <div class="container mx-auto p-6 max-w-4xl">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">Minhas Carteiras</h1>
+        
+        <div class="flex gap-3 mb-8">
+            <a href="/portfolios/setup" 
+               class="inline-block bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-semibold shadow-sm">
+                ➕ Criar Nova Carteira
+            </a>
+            <a href="/imports" 
+               class="inline-block bg-green-50 text-green-700 border border-green-200 px-6 py-3 rounded-lg hover:bg-green-100 font-semibold">
+                📥 Importar Portfólio
+            </a>
+        </div>
+        
+        <div class="bg-white shadow-md rounded-lg overflow-hidden">
+            <h2 class="text-xl font-semibold p-4 bg-gray-50 border-b">Carteiras Existentes</h2>
+            
+            {% if portfolios and portfolios|length > 0 %}
+            <ul class="divide-y">
+                {% for portfolio in portfolios %}
+                <li class="p-4 hover:bg-gray-50 flex justify-between items-center">
+                    <div>
+                        <span class="font-medium text-lg">{{ portfolio.name }}</span>
+                        <p class="text-sm text-gray-500">
+                            Criada em: {{ portfolio.created_at.strftime('%d/%m/%Y') }}
+                            {% if portfolio.total_value %}
+                            | Valor: {{ portfolio.currency if portfolio.currency else 'USD' }} {{ "{:,.2f}".format(portfolio.total_value) }}
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="flex gap-2">
+                        <a href="/dashboard/?portfolio_id={{ portfolio.id }}&template=v1" 
+                           class="bg-green-50 text-green-700 border border-green-200 px-4 py-2 rounded hover:bg-green-100 text-sm">
+                            📊 Dashboard
+                        </a>
+                        <button onclick="openEditModal({{ portfolio.id }}, '{{ portfolio.name }}', {{ portfolio.total_value or 0 }}, '{{ portfolio.currency or 'USD' }}', '{{ portfolio.description or '' }}')" 
+                                class="bg-green-50 text-green-600 border border-green-200 px-4 py-2 rounded hover:bg-green-100 text-sm">
+                            ✏️ Editar
+                        </button>
+                        <button onclick="confirmDelete({{ portfolio.id }}, '{{ portfolio.name }}')" 
+                                class="bg-green-50 text-green-700 border border-green-200 px-4 py-2 rounded hover:bg-green-100 text-sm">
+                            🗑️ Deletar
+                        </button>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="p-8 text-center text-gray-500">
+                <p class="text-lg">Nenhuma carteira encontrada</p>
+                <p class="text-sm mt-2">Clique em "Criar Nova Carteira" para começar</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Modal: Editar Carteira -->
+    <div id="editModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="if(event.target===this)closeModal()">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold">✏️ Editar Carteira</h2>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
+            </div>
+            <form id="editForm" class="space-y-4">
+                <input type="hidden" id="edit_id">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Nome da Carteira</label>
+                    <input type="text" id="edit_name" class="w-full px-3 py-2 border rounded" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Valor Total</label>
+                    <input type="text" id="edit_value" class="w-full px-3 py-2 border rounded" required>
+                    <p class="text-xs text-gray-500 mt-1">Valor total que você quer alocar nesta carteira</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Moeda</label>
+                    <select id="edit_currency" class="w-full px-3 py-2 border rounded">
+                        <option value="USD">USD - Dólar</option>
+                        <option value="BRL">BRL - Real</option>
+                        <option value="EUR">EUR - Euro</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Descrição</label>
+                    <textarea id="edit_description" class="w-full px-3 py-2 border rounded" rows="2"></textarea>
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="submit" class="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Salvar</button>
+                    <button type="button" onclick="closeModal()" class="flex-1 bg-green-50 text-green-700 border border-green-200 px-4 py-2 rounded hover:bg-green-100">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    function parseNumber(val) {
+        if (!val) return 0;
+        return parseFloat(String(val).trim().replace(/,/g, '.')) || 0;
+    }
+    
+    function openEditModal(id, name, value, currency, description) {
+        document.getElementById('edit_id').value = id;
+        document.getElementById('edit_name').value = name;
+        document.getElementById('edit_value').value = value;
+        document.getElementById('edit_currency').value = currency;
+        document.getElementById('edit_description').value = description || '';
+        document.getElementById('editModal').classList.remove('hidden');
+    }
+    
+    function closeModal() {
+        document.getElementById('editModal').classList.add('hidden');
+    }
+    
+    document.getElementById('editForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('edit_id').value;
+        const data = {
+            name: document.getElementById('edit_name').value.trim(),
+            total_value: parseNumber(document.getElementById('edit_value').value),
+            currency: document.getElementById('edit_currency').value,
+            description: document.getElementById('edit_description').value.trim()
+        };
+        
+        try {
+            const resp = await fetch(`/portfolios/${id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            
+            if (!resp.ok) {
+                const err = await resp.json();
+                throw new Error(err.detail || 'Erro ao atualizar');
+            }
+            
+            window.location.reload();
+        } catch (e) {
+            alert('Erro: ' + e.message);
+        }
+    });
+    
+    async function confirmDelete(id, name) {
+        if (!confirm(`Tem certeza que deseja deletar a carteira "${name}"?\n\nTodos os ativos e configurações serão removidos permanentemente.`)) {
+            return;
+        }
+        
+        try {
+            const resp = await fetch(`/portfolios/${id}`, { method: 'DELETE' });
+            if (!resp.ok && resp.status !== 204) {
+                throw new Error('Erro ao deletar');
+            }
+            window.location.reload();
+        } catch (e) {
+            alert('Erro: ' + e.message);
+        }
+    }
+    
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeModal();
+    });
+    </script>
+</body>
+</html>

@@ -1,0 +1,358 @@
+<!-- app/templates/portfolio_import.html -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .tag { background:#eef2ff; border:1px solid #c7d2fe; padding:2px 8px; border-radius:999px; font-size:12px; }
+        .warn { background:#fef3c7; border:1px solid #f59e0b; color:#92400e; }
+        .ok { background:#dcfce7; border:1px solid #16a34a; color:#166534; }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+    <div class="container mx-auto p-6 max-w-7xl">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <a href="/portfolios/list" class="text-blue-600 hover:underline mb-2 inline-block text-sm">&larr; Voltar</a>
+                <h1 class="text-3xl font-bold text-gray-800">Importar Portfólio</h1>
+                <p class="text-sm text-gray-500">OCR via Tesseract • pré‑visualização com preços em tempo real</p>
+            </div>
+        </div>
+
+        <!-- Seleção de Portfólio -->
+        <div class="bg-white shadow rounded-lg p-5 mb-6">
+            <h2 class="text-lg font-semibold mb-3">Portfólio de Destino</h2>
+            <div class="flex gap-6 items-start">
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="radio" name="portfolioMode" value="new" checked>
+                    Criar novo portfólio
+                </label>
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="radio" name="portfolioMode" value="existing">
+                    Usar portfólio existente
+                </label>
+            </div>
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div id="newPortfolioFields">
+                    <label class="block text-sm font-medium mb-1">Nome do Portfólio</label>
+                    <input id="newPortfolioName" class="w-full px-3 py-2 border rounded" placeholder="Ex: Carteira Schwab" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Valor Total (opcional)</label>
+                    <input id="newPortfolioTotal" class="w-full px-3 py-2 border rounded" placeholder="100000" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Moeda</label>
+                    <select id="currencySelect" class="w-full px-3 py-2 border rounded">
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                        <option value="JPY">JPY</option>
+                        <option value="GBP">GBP</option>
+                        <option value="CHF">CHF</option>
+                        <option value="CAD">CAD</option>
+                        <option value="AUD">AUD</option>
+                        <option value="NZD">NZD</option>
+                        <option value="CNY">CNY</option>
+                        <option value="BRL">BRL</option>
+                    </select>
+                    <div id="currencyDetected" class="mt-2 text-xs text-gray-600 hidden">
+                        Moeda detectada: <span id="currencyDetectedValue" class="font-semibold"></span>
+                        <button class="ml-2 text-blue-600 hover:underline" onclick="useDetectedCurrency()">Usar detectada</button>
+                    </div>
+                </div>
+            </div>
+            <div id="existingPortfolioFields" class="mt-4 hidden">
+                <label class="block text-sm font-medium mb-1">Portfólio existente</label>
+                <select id="existingPortfolioSelect" class="w-full px-3 py-2 border rounded">
+                    <option value="">Selecione...</option>
+                    {% for p in portfolios %}
+                    <option value="{{ p.id }}">{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+                <div id="existingSummary" class="mt-3 text-xs text-gray-600 hidden"></div>
+            </div>
+        </div>
+
+        <!-- Upload -->
+        <div class="bg-white shadow rounded-lg p-5 mb-6">
+            <h2 class="text-lg font-semibold mb-3">Adicionar Arquivo (print)</h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Fonte</label>
+                    <select id="sourceSelect" class="w-full px-3 py-2 border rounded">
+                        <option value="schwab">Schwab</option>
+                        <option value="hardwallet">Hardwallet</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium mb-1">Arquivo</label>
+                    <input id="fileInput" type="file" accept="image/*" class="w-full px-3 py-2 border rounded bg-white" />
+                </div>
+                <div>
+                    <button id="addFileBtn" class="w-full bg-green-50 text-green-700 border border-green-200 px-4 py-2 rounded hover:bg-green-100">
+                        + Adicionar arquivo
+                    </button>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">Você pode adicionar vários arquivos para o mesmo portfólio.</p>
+        </div>
+
+        <!-- Preview -->
+        <div class="bg-white shadow rounded-lg p-5 mb-6">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-lg font-semibold">Pré‑visualização</h2>
+                <span id="previewCount" class="text-xs text-gray-500">0 itens</span>
+            </div>
+
+            <div class="overflow-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="bg-gray-50 text-gray-600 uppercase text-xs">
+                            <th class="py-2 px-3 text-left">Ativo</th>
+                            <th class="py-2 px-3 text-right">Quantidade</th>
+                            <th class="py-2 px-3 text-right">Preço</th>
+                            <th class="py-2 px-3 text-left">Classes possíveis</th>
+                            <th class="py-2 px-3 text-left">Classe escolhida</th>
+                            <th class="py-2 px-3 text-center">Consenso</th>
+                        </tr>
+                    </thead>
+                    <tbody id="previewBody">
+                        <tr><td class="py-4 px-3 text-gray-500" colspan="6">Nenhum item importado ainda.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-4 flex justify-end gap-3">
+                <button id="clearBtn" class="bg-green-50 text-green-700 border border-green-200 px-4 py-2 rounded hover:bg-green-100">Limpar</button>
+                <button id="confirmBtn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Confirmar Importação</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    let importItems = [];
+    let availableClasses = [];
+    let detectedCurrency = null;
+    const topCurrencies = ["USD","EUR","JPY","GBP","CHF","CAD","AUD","NZD","CNY","BRL"];
+
+    function useDetectedCurrency() {
+        if (detectedCurrency) {
+            document.getElementById('currencySelect').value = detectedCurrency;
+        }
+    }
+
+    function renderPreview() {
+        const body = document.getElementById('previewBody');
+        document.getElementById('previewCount').textContent = `${importItems.length} itens`;
+        if (importItems.length === 0) {
+            body.innerHTML = '<tr><td class="py-4 px-3 text-gray-500" colspan="6">Nenhum item importado ainda.</td></tr>';
+            return;
+        }
+        body.innerHTML = '';
+        importItems.forEach((item, idx) => {
+            const tr = document.createElement('tr');
+            tr.className = 'border-t';
+            const diverged = item.price_diverged;
+            tr.innerHTML = `
+                <td class="py-2 px-3">
+                    <input class="border rounded px-2 py-1 w-28" value="${item.ticker}" data-idx="${idx}" data-field="ticker"/>
+                    <div class="text-xs text-gray-500">${item.name || ''}</div>
+                    ${renderTickerSuggestions(item, idx)}
+                </td>
+                <td class="py-2 px-3 text-right">
+                    <input class="border rounded px-2 py-1 w-24 text-right" value="${item.quantity}" data-idx="${idx}" data-field="quantity"/>
+                </td>
+                <td class="py-2 px-3 text-right">
+                    ${item.price ? item.price.toFixed(2) : '<span class="text-red-500">sem preço</span>'}
+                    <div class="text-[10px] text-gray-400">${item.price_sources || ''}</div>
+                </td>
+                <td class="py-2 px-3">
+                    ${renderPossibleClasses(item, idx)}
+                </td>
+                <td class="py-2 px-3">
+                    ${renderClassSelect(item, idx)}
+                </td>
+                <td class="py-2 px-3 text-center">
+                    <span class="tag ${diverged ? 'warn' : 'ok'}">${diverged ? '⚠️ Divergente' : 'OK'}</span>
+                </td>
+            `;
+            body.appendChild(tr);
+        });
+        attachInputHandlers();
+    }
+
+    function renderPossibleClasses(item, idx) {
+        const list = item.possible_classes || [];
+        const tags = list.map(c => `<span class="tag mr-1 mb-1 inline-block">${c}</span>`).join('');
+        return `
+            <div class="mb-1">${tags || '<span class=\"text-xs text-gray-400\">sem sugestões</span>'}</div>
+            <input class="border rounded px-2 py-1 text-xs w-40" placeholder="Adicionar classe possível"
+                   data-idx="${idx}" data-field="possible_add"/>
+        `;
+    }
+
+    function renderTickerSuggestions(item, idx) {
+        const list = item.ticker_suggestions || [];
+        if (!list.length) return '';
+        const tags = list.map(t => `<button class="tag mr-1 mt-1" onclick="setTicker(${idx}, '${t}')">${t}</button>`).join('');
+        return `<div class="mt-1">${tags}</div>`;
+    }
+
+    function setTicker(idx, ticker) {
+        importItems[idx].ticker = ticker;
+        renderPreview();
+    }
+
+    function renderClassSelect(item, idx) {
+        const options = [...new Set([...(availableClasses || []), ...(item.possible_classes || [])])];
+        const selected = item.class_name || '';
+        const optHtml = ['<option value=\"\">Selecione...</option>']
+            .concat(options.map(c => `<option value=\"${c}\" ${c===selected?'selected':''}>${c}</option>`))
+            .concat(['<option value=\"__new__\">+ Nova classe...</option>'])
+            .join('');
+        return `
+            <select class="border rounded px-2 py-1 text-xs w-40" data-idx="${idx}" data-field="class_name">
+                ${optHtml}
+            </select>
+            <input class="border rounded px-2 py-1 text-xs w-40 mt-1 hidden" placeholder="Nome da nova classe"
+                   data-idx="${idx}" data-field="class_new"/>
+        `;
+    }
+
+    function attachInputHandlers() {
+        document.querySelectorAll('[data-field]').forEach(el => {
+            el.onchange = (e) => {
+                const idx = parseInt(el.dataset.idx, 10);
+                const field = el.dataset.field;
+                if (field === 'ticker') importItems[idx].ticker = el.value.toUpperCase();
+                if (field === 'quantity') importItems[idx].quantity = parseFloat(el.value) || 0;
+                if (field === 'class_name') {
+                    if (el.value === '__new__') {
+                        el.parentElement.querySelector('[data-field=\"class_new\"]').classList.remove('hidden');
+                        importItems[idx].class_name = '';
+                    } else {
+                        importItems[idx].class_name = el.value;
+                        el.parentElement.querySelector('[data-field=\"class_new\"]').classList.add('hidden');
+                    }
+                }
+                if (field === 'class_new') {
+                    importItems[idx].class_name = el.value;
+                }
+                if (field === 'possible_add') {
+                    const val = el.value.trim();
+                    if (val) {
+                        importItems[idx].possible_classes = [...new Set([...(importItems[idx].possible_classes||[]), val])];
+                        renderPreview();
+                    }
+                }
+            };
+        });
+    }
+
+    document.getElementById('addFileBtn').addEventListener('click', async () => {
+        const file = document.getElementById('fileInput').files[0];
+        if (!file) return alert('Selecione um arquivo');
+        const source = document.getElementById('sourceSelect').value;
+        const portfolioMode = document.querySelector('input[name=\"portfolioMode\"]:checked').value;
+        const portfolioId = portfolioMode === 'existing' ? document.getElementById('existingPortfolioSelect').value : '';
+
+        const form = new FormData();
+        form.append('file', file);
+        form.append('source', source);
+        if (portfolioId) form.append('portfolio_id', portfolioId);
+
+        const resp = await fetch('/imports/preview', { method: 'POST', body: form });
+        if (!resp.ok) return alert('Erro ao processar OCR');
+        const data = await resp.json();
+
+        detectedCurrency = data.detected_currency || detectedCurrency;
+        if (detectedCurrency) {
+            document.getElementById('currencyDetected').classList.remove('hidden');
+            document.getElementById('currencyDetectedValue').textContent = detectedCurrency;
+            const current = document.getElementById('currencySelect').value;
+            if (current === 'USD' && detectedCurrency !== current) {
+                if (confirm(`Moeda detectada: ${detectedCurrency}. Deseja usar?`)) {
+                    document.getElementById('currencySelect').value = detectedCurrency;
+                }
+            }
+        }
+        if (data.available_classes && data.available_classes.length) {
+            availableClasses = data.available_classes;
+        }
+        const newItems = data.items.map(it => ({
+            ...it,
+            possible_classes: it.suggested_classes || [],
+            class_name: (it.suggested_classes && it.suggested_classes[0]) || ''
+        }));
+        if (newItems.length === 0) {
+            alert('Não foi possível extrair itens desse print. Tente outro arquivo ou ajuste o recorte.');
+        }
+        importItems = importItems.concat(newItems);
+        renderPreview();
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+        importItems = [];
+        renderPreview();
+    });
+
+    document.getElementsByName('portfolioMode').forEach(r => {
+        r.addEventListener('change', () => {
+            const mode = document.querySelector('input[name=\"portfolioMode\"]:checked').value;
+            document.getElementById('existingPortfolioFields').classList.toggle('hidden', mode !== 'existing');
+            document.getElementById('newPortfolioFields').classList.toggle('hidden', mode !== 'new');
+        });
+    });
+
+    document.getElementById('existingPortfolioSelect').addEventListener('change', async (e) => {
+        const id = e.target.value;
+        if (!id) return;
+        const resp = await fetch(`/imports/portfolio-summary/${id}`);
+        const data = await resp.json();
+        availableClasses = data.classes || [];
+        document.getElementById('currencySelect').value = data.currency || 'USD';
+        const summary = data.assets.map(a => `${a.ticker} (${a.class_name}) x ${a.quantity}`).slice(0,10).join(' | ');
+        document.getElementById('existingSummary').classList.remove('hidden');
+        document.getElementById('existingSummary').innerHTML = `<strong>Carteira atual:</strong> ${summary || 'vazia'}<br><span class="text-orange-600">Importação irá somar quantidades dos ativos existentes.</span>`;
+        renderPreview();
+    });
+
+    document.getElementById('confirmBtn').addEventListener('click', async () => {
+        if (importItems.length === 0) return alert('Nenhum item para importar');
+        const portfolioMode = document.querySelector('input[name=\"portfolioMode\"]:checked').value;
+        const portfolioId = portfolioMode === 'existing' ? document.getElementById('existingPortfolioSelect').value : null;
+        if (portfolioMode === 'existing' && !portfolioId) return alert('Selecione um portfólio existente');
+        if (portfolioMode === 'new' && !document.getElementById('newPortfolioName').value.trim()) return alert('Informe o nome do novo portfólio');
+
+        const missingClass = importItems.find(i => !i.class_name || !i.class_name.trim());
+        if (missingClass) {
+            return alert('Existem ativos sem classe escolhida.');
+        }
+
+        const payload = {
+            portfolio_id: portfolioId ? parseInt(portfolioId, 10) : null,
+            new_portfolio_name: document.getElementById('newPortfolioName').value.trim(),
+            total_value: parseFloat(document.getElementById('newPortfolioTotal').value) || 0,
+            currency: document.getElementById('currencySelect').value,
+            items: importItems
+        };
+
+        if (!confirm('Confirmar importação?')) return;
+        const resp = await fetch('/imports/confirm', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        if (!resp.ok) {
+            const err = await resp.json();
+            return alert(err.detail || 'Erro ao importar');
+        }
+        const data = await resp.json();
+        window.location.href = `/dashboard/?portfolio_id=${data.portfolio_id}`;
+    });
+    </script>
+</body>
+</html>

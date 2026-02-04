@@ -1,0 +1,629 @@
+<!-- app/templates/dashboard_v3.html -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@2.3.0/dist/chartjs-chart-treemap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #64748b;
+      --card: #ffffff;
+      --line: #e2e8f0;
+      --accent: #0f766e;
+      --bg: #f8fafc;
+    }
+    body { font-family: "IBM Plex Sans", system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; }
+    .chip { background: #f1f5f9; color: var(--muted); border: 1px solid var(--line); }
+    .title { letter-spacing: .02em; }
+    .divider { border-top: 1px solid var(--line); }
+    .accordion summary { cursor: pointer; }
+    .mono { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="max-w-7xl mx-auto px-6 py-8">
+    <div class="flex items-start justify-between mb-6 gap-4">
+      <div>
+        <a href="/portfolios/list" onclick="window.location.href='/portfolios/list'; return false;" class="text-sm text-teal-700 hover:underline">&larr; Voltar às Carteiras</a>
+        <h1 class="text-3xl font-semibold mt-2">{{ portfolio_name }}</h1>
+      </div>
+      <div class="flex flex-wrap gap-2 items-center">
+        <div id="priceStatus" class="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-sm">
+          <span class="inline-block w-2 h-2 rounded-full bg-green-500" id="statusDot"></span>
+          <span id="statusText">Atualizado</span>
+        </div>
+        <button onclick="updatePrices()" id="updateBtn" class="bg-white text-slate-700 border border-slate-200 px-3 py-2 rounded-lg text-sm hover:bg-slate-50">🔄 Atualizar Preços</button>
+        <button onclick="openEditPortfolioModal()" class="bg-white text-slate-700 border border-slate-200 px-3 py-2 rounded-lg text-sm hover:bg-slate-50">⚙️ Editar</button>
+        <button id="addAssetBtn" onclick="openAddAssetModal()" class="bg-white text-slate-700 border border-slate-200 px-3 py-2 rounded-lg text-sm hover:bg-slate-50 whitespace-nowrap min-w-[170px] text-center">➕ Adicionar Ativo</button>
+        <select id="templateSelect" onchange="setDashboardTemplate(this.value)"
+                class="px-3 py-2 border rounded-lg text-sm bg-white min-w-[140px]">
+          <option value="v1" {% if dashboard_template == 'v1' %}selected{% endif %}>Template 1</option>
+          <option value="v2" {% if dashboard_template == 'v2' %}selected{% endif %}>Template 2</option>
+          <option value="v3" {% if dashboard_template == 'v3' %}selected{% endif %}>Template 3</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div class="card p-4">
+        <div class="text-xs uppercase mono">Valor Total</div>
+        <div class="text-2xl font-semibold">{{ currency }} {{ "{:,.2f}".format(total_portfolio_value) }}</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-xs uppercase mono">Valor Alocado</div>
+        <div class="text-2xl font-semibold">{{ currency }} {{ "{:,.2f}".format(total_real_value) }}</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-xs uppercase mono">Cash</div>
+        <div class="text-2xl font-semibold">{{ currency }} {{ "{:,.2f}".format(summary.total_cash) }}</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-xs uppercase mono">Ativos</div>
+        <div class="text-2xl font-semibold">{{ summary.total_assets }}</div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div class="card p-4">
+        <h2 class="title text-sm font-semibold text-slate-600 mb-3">Alocação por Classe (Treemap)</h2>
+        <div class="w-full" style="height:240px;">
+          <canvas id="treemapChart"></canvas>
+        </div>
+      </div>
+      <div class="card p-4">
+        <h2 class="title text-sm font-semibold text-slate-600 mb-3">Meta vs Real (Bullet)</h2>
+        <div class="w-full" style="height:240px;">
+          <canvas id="bulletChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-4">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="title text-sm font-semibold text-slate-600">Classes e Ativos (lista discreta)</h2>
+        <button onclick="toggleAllClasses()" class="text-xs text-teal-700 hover:underline">Expandir/Recolher Todos</button>
+      </div>
+      <div class="mb-4 p-3 bg-gray-50 rounded flex flex-wrap gap-3 items-center text-xs">
+        <span class="font-medium">Filtros:</span>
+        <input type="text" id="globalSearch" placeholder="Buscar..." onkeyup="applyFilters()"
+               class="px-3 py-1 border rounded w-48 text-sm">
+        <select id="filterStatus" onchange="applyFilters()" class="px-3 py-1 border rounded text-sm">
+          <option value="">Todos os Status</option>
+          <option value="OK">✅ OK</option>
+          <option value="Alerta">⚠️ Alerta</option>
+          <option value="Crítico">🚨 Crítico</option>
+          <option value="Extremamente Crítico">💥 Extremamente Crítico</option>
+        </select>
+        <button onclick="clearFilters()" class="text-gray-500 hover:text-gray-700">✕ Limpar</button>
+      </div>
+      {% for asset_class in asset_classes %}
+      <details class="accordion border border-slate-200 rounded-lg p-3 mb-3 bg-white asset-class-group" data-class-id="{{ asset_class.id }}" open>
+        <summary class="flex justify-between items-center">
+          <div class="font-semibold">{{ asset_class.name }}</div>
+          <div class="text-xs mono">Meta {{ "{:.1f}".format(asset_class.target_percentage) }}% • Real {{ "{:.1f}".format(asset_class.current_percentage) }}%</div>
+        </summary>
+        <div class="mt-3">
+          <div class="text-xs mono mb-2">Alvo {{ currency }} {{ "{:,.0f}".format(asset_class.target_value) }} • Cash {{ currency }} {{ "{:,.0f}".format(asset_class.cash_value) }}</div>
+          <div class="overflow-auto border border-slate-200 rounded-lg">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
+                <tr>
+                  <th class="py-2 px-3 text-left cursor-pointer hover:bg-slate-100" onclick="sortTable({{ asset_class.id }}, 'name')">Ativo</th>
+                  <th class="py-2 px-3 text-right cursor-pointer hover:bg-slate-100" onclick="sortTable({{ asset_class.id }}, 'quantity')">Qtd</th>
+                  <th class="py-2 px-3 text-right cursor-pointer hover:bg-slate-100" onclick="sortTable({{ asset_class.id }}, 'current_price')">Cotação</th>
+                  <th class="py-2 px-3 text-right cursor-pointer hover:bg-slate-100" onclick="sortTable({{ asset_class.id }}, 'current_value')">Valor</th>
+                  <th class="py-2 px-3 text-right cursor-pointer hover:bg-slate-100" onclick="sortTable({{ asset_class.id }}, 'current_percentage_class')">% Atual (Classe)</th>
+                  <th class="py-2 px-3 text-right cursor-pointer hover:bg-slate-100" onclick="sortTable({{ asset_class.id }}, 'target_percentage')">% Meta (Classe)</th>
+                  <th class="py-2 px-3 text-right cursor-pointer hover:bg-slate-100" onclick="sortTable({{ asset_class.id }}, 'deviation_percentage')">Desvio (Classe)</th>
+                  <th class="py-2 px-3 text-right cursor-pointer hover:bg-slate-100" onclick="sortTable({{ asset_class.id }}, 'current_percentage')">% Atual (Portf)</th>
+                  <th class="py-2 px-3 text-right cursor-pointer hover:bg-slate-100" onclick="sortTable({{ asset_class.id }}, 'target_percentage_portfolio')">% Meta (Portf)</th>
+                  <th class="py-2 px-3 text-right cursor-pointer hover:bg-slate-100" onclick="sortTable({{ asset_class.id }}, 'deviation_percentage_portfolio')">Desvio (Portf)</th>
+                  <th class="py-2 px-3 text-center cursor-pointer hover:bg-slate-100" onclick="sortTable({{ asset_class.id }}, 'status')">Status</th>
+                  <th class="py-2 px-3 text-right cursor-pointer hover:bg-slate-100" onclick="sortTable({{ asset_class.id }}, 'units_to_buy')">Comprar/Vender</th>
+                  <th class="py-2 px-3 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for asset in asset_class.assets %}
+                <tr class="border-t asset-row"
+                    data-name="{{ asset.name }}"
+                    data-ticker="{{ asset.ticker }}"
+                    data-status="{{ asset.rebalance_status }}"
+                    data-quantity="{{ asset.quantity }}"
+                    data-current_price="{{ asset.current_price }}"
+                    data-current_value="{{ asset.current_value }}"
+                    data-current_percentage="{{ asset.current_percentage }}"
+                    data-target_percentage="{{ asset.target_percentage }}"
+                    data-current_percentage_class="{{ asset.current_percentage_class }}"
+                    data-deviation_percentage="{{ asset.deviation_percentage }}"
+                    data-target_percentage_portfolio="{{ asset.target_percentage_portfolio }}"
+                    data-deviation_percentage_portfolio="{{ asset.deviation_percentage_portfolio }}"
+                    data-units_to_buy="{{ asset.units_to_buy }}">
+                  <td class="py-2 px-3">
+                    <div class="font-medium">{{ asset.ticker }}</div>
+                    <div class="text-xs text-slate-500">{{ asset.name }}</div>
+                  </td>
+                  <td class="py-2 px-3 text-right">{{ "{:,.4f}".format(asset.quantity).rstrip('0').rstrip('.') }}</td>
+                  <td class="py-2 px-3 text-right {% if asset.current_price == 0 %}text-red-500{% endif %}">
+                    {{ currency }} {{ "{:,.2f}".format(asset.current_price) }}
+                    {% if asset.current_price == 0 %}<span class="text-xs">⚠️</span>{% endif %}
+                  </td>
+                  <td class="py-2 px-3 text-right">{{ currency }} {{ "{:,.2f}".format(asset.current_value) }}</td>
+                  <td class="py-2 px-3 text-right">{{ "{:.2f}".format(asset.current_percentage_class) }}%</td>
+                  <td class="py-2 px-3 text-right">{{ "{:.2f}".format(asset.target_percentage) }}%</td>
+                  <td class="py-2 px-3 text-right">{{ "{:+.2f}".format(asset.deviation_percentage) }}%</td>
+                  <td class="py-2 px-3 text-right">{{ "{:.2f}".format(asset.current_percentage) }}%</td>
+                  <td class="py-2 px-3 text-right">{{ "{:.2f}".format(asset.target_percentage_portfolio) }}%</td>
+                  <td class="py-2 px-3 text-right">{{ "{:+.2f}".format(asset.deviation_percentage_portfolio) }}%</td>
+                  <td class="py-2 px-3 text-center {{ asset.rebalance_color_class }} font-medium">
+                    {{ asset.rebalance_emoji }}
+                  </td>
+                  <td class="py-2 px-3 text-right text-xs">
+                    {% if asset.units_to_buy > 0 %}
+                    <span class="text-green-600">+{{ "{:,.2f}".format(asset.units_to_buy) }} un</span>
+                    {% elif asset.units_to_buy < 0 %}
+                    <span class="text-red-600">{{ "{:,.2f}".format(asset.units_to_buy) }} un</span>
+                    {% else %}
+                    <span class="text-gray-400">-</span>
+                    {% endif %}
+                  </td>
+                  <td class="py-2 px-3 text-center">
+                    <button onclick="openEditAssetModal({{ asset.id }}, '{{ asset.name }}', '{{ asset.ticker }}', {{ asset.quantity }}, {{ asset.target_percentage }}, {{ asset.current_price }})"
+                            class="text-slate-700 hover:text-slate-900" title="Editar">✏️</button>
+                    <button onclick="confirmDeleteAsset({{ asset.id }}, '{{ asset.ticker }}')"
+                            class="text-red-600 hover:text-red-800 ml-1" title="Remover">🗑️</button>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- MODAIS -->
+  <div id="editPortfolioModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="if(event.target===this)closeModal('editPortfolioModal')">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4" onclick="event.stopPropagation()">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold">⚙️ Editar Carteira</h2>
+        <button onclick="closeModal('editPortfolioModal')" class="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
+      </div>
+      <form id="editPortfolioForm" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">Nome da Carteira</label>
+          <input type="text" id="edit_portfolio_name" value="{{ portfolio_name }}" class="w-full px-3 py-2 border rounded" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Valor Total ({{ currency }})</label>
+          <input type="text" id="edit_portfolio_value" value="{{ total_portfolio_value }}" class="w-full px-3 py-2 border rounded" required>
+          <p class="text-xs text-gray-500 mt-1">Este é o valor que você quer alocar na carteira</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Moeda</label>
+          <select id="edit_portfolio_currency" class="w-full px-3 py-2 border rounded">
+            <option value="USD" {% if currency == 'USD' %}selected{% endif %}>USD - Dólar</option>
+            <option value="BRL" {% if currency == 'BRL' %}selected{% endif %}>BRL - Real</option>
+            <option value="EUR" {% if currency == 'EUR' %}selected{% endif %}>EUR - Euro</option>
+          </select>
+        </div>
+        <div class="flex gap-3 pt-2">
+          <button type="submit" class="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Salvar</button>
+          <button type="button" onclick="closeModal('editPortfolioModal')" class="flex-1 bg-green-50 text-green-700 border border-green-200 px-4 py-2 rounded hover:bg-green-100">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="addAssetModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="if(event.target===this)closeModal('addAssetModal')">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4" onclick="event.stopPropagation()">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold">➕ Adicionar Ativo</h2>
+        <button onclick="closeModal('addAssetModal')" class="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
+      </div>
+      <form id="addAssetForm" class="space-y-3">
+        <div>
+          <label class="block text-sm font-medium mb-1">Ticker *</label>
+          <input type="text" id="add_ticker" placeholder="AAPL, BTC-USD, PETR4.SA" class="w-full px-3 py-2 border rounded uppercase" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Nome</label>
+          <input type="text" id="add_name" placeholder="Apple Inc." class="w-full px-3 py-2 border rounded">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Classe *</label>
+          <select id="add_class" class="w-full px-3 py-2 border rounded" required>
+            <option value="">Selecione...</option>
+            {% for ac in asset_classes %}
+            <option value="{{ ac.id }}">{{ ac.name }} ({{ "{:.1f}".format(ac.target_percentage) }}%)</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium mb-1">Quantidade *</label>
+            <input type="text" id="add_quantity" placeholder="10 (deixe vazio para auto)" class="w-full px-3 py-2 border rounded">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">% Meta (da Classe) *</label>
+            <input type="text" id="add_target_pct" placeholder="50" class="w-full px-3 py-2 border rounded" required>
+          </div>
+        </div>
+        <div class="p-2 bg-blue-50 rounded text-xs text-gray-600">
+          💡 US: AAPL, MSFT | BR: PETR4.SA | Crypto: BTC-USD
+        </div>
+        <div class="flex gap-3 pt-2">
+          <button type="submit" class="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Adicionar</button>
+          <button type="button" onclick="closeModal('addAssetModal')" class="flex-1 bg-green-50 text-green-700 border border-green-200 px-4 py-2 rounded hover:bg-green-100">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="editAssetModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="if(event.target===this)closeModal('editAssetModal')">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4" onclick="event.stopPropagation()">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold">✏️ Editar: <span id="edit_asset_ticker_display" class="text-blue-600"></span></h2>
+        <button onclick="closeModal('editAssetModal')" class="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
+      </div>
+      <form id="editAssetForm" class="space-y-3">
+        <input type="hidden" id="edit_asset_id">
+        <input type="hidden" id="edit_asset_ticker">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium mb-1">Quantidade</label>
+            <input type="text" id="edit_asset_quantity" class="w-full px-3 py-2 border rounded" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">% Meta (da Classe)</label>
+            <input type="text" id="edit_asset_target_pct" class="w-full px-3 py-2 border rounded" required>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Preço Manual ({{ currency }})</label>
+          <input type="text" id="edit_asset_price" placeholder="Deixe vazio para manter" class="w-full px-3 py-2 border rounded">
+          <p class="text-xs text-gray-500 mt-1">Use quando o preço automático não funcionar</p>
+        </div>
+        <div class="flex gap-3 pt-2">
+          <button type="submit" class="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Salvar</button>
+          <button type="button" onclick="closeModal('editAssetModal')" class="flex-1 bg-green-50 text-green-700 border border-green-200 px-4 py-2 rounded hover:bg-green-100">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const portfolioId = {{ portfolio_id }};
+    const currency = "{{ currency }}";
+    const classesData = {{ asset_classes | tojson | safe }};
+    const chartColors = [
+      '#0f766e', '#115e59', '#134e4a', '#0f766e',
+      '#1f6f8b', '#1e5f74', '#2c4f5e', '#2b4c5a',
+      '#1f6f8b', '#0f766e'
+    ];
+    const pctMap = {};
+    classesData.forEach(c => { pctMap[c.name] = c.target_percentage; });
+
+    if (window.ChartDataLabels) {
+      Chart.register(ChartDataLabels);
+    }
+
+    const treemapCtx = document.getElementById('treemapChart');
+    if (treemapCtx) {
+      const totalValue = classesData.reduce((sum, c) => sum + (c.target_value || 0), 0);
+      new Chart(treemapCtx, {
+        type: 'treemap',
+        data: {
+          datasets: [{
+            tree: classesData.map(c => ({ name: c.name, value: c.target_value, target_percentage: c.target_percentage })),
+            key: 'value',
+            groups: ['name'],
+            spacing: 1,
+            borderWidth: 1,
+            borderColor: '#e2e8f0',
+            backgroundColor(ctx) {
+              const value = ctx.raw?.v || 0;
+              if (value <= 0) return 'rgba(148,163,184,0.25)';
+              const idx = ctx.dataIndex % chartColors.length;
+              return chartColors[idx] + '40';
+            },
+            labels: {
+              display: true,
+              formatter(ctx) {
+                const data = ctx.raw && ctx.raw._data ? ctx.raw._data : null;
+                if (!data) return '';
+                const name = data.name || data.g || '';
+                const pct = pctMap[name] ?? data.target_percentage ?? 0;
+                return `${name}\n${Number(pct).toFixed(1)}%`;
+              },
+              color: '#0f172a',
+              font: { size: 11, weight: '600' }
+            }
+          }]
+        },
+        options: {
+          plugins: {
+            legend: { display: false },
+            datalabels: { display: false }
+          },
+          maintainAspectRatio: false
+        }
+      });
+    }
+
+    const bulletCtx = document.getElementById('bulletChart');
+    if (bulletCtx) {
+      const labels = classesData.map(c => c.name);
+      const real = classesData.map(c => c.current_percentage);
+      const target = classesData.map(c => c.target_percentage);
+
+      new Chart(bulletCtx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Real %',
+            data: real,
+            backgroundColor: labels.map((_, i) => chartColors[i % chartColors.length] + '40'),
+            borderRadius: 6
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          plugins: {
+            legend: { display: false },
+            annotation: {
+              annotations: labels.map((_, i) => ({
+                type: 'line',
+                xMin: target[i],
+                xMax: target[i],
+                yMin: i - 0.4,
+                yMax: i + 0.4,
+                borderColor: '#0f172a',
+                borderWidth: 2
+              }))
+            },
+            datalabels: {
+              color: '#0f172a',
+              font: { size: 10, weight: '600' },
+              anchor: 'end',
+              align: 'right',
+              formatter: (value) => `${value.toFixed(1)}%`
+            }
+          },
+          scales: {
+            x: { beginAtZero: true, ticks: { callback: v => v + '%' } },
+            y: { ticks: { font: { size: 11 } } }
+          },
+          maintainAspectRatio: false
+        }
+      }, [ChartDataLabels]);
+    }
+  </script>
+
+  <script>
+    async function updatePrices() {
+      const btn = document.getElementById('updateBtn');
+      const statusDot = document.getElementById('statusDot');
+      const statusText = document.getElementById('statusText');
+      btn.disabled = true;
+      statusDot.className = 'inline-block w-2 h-2 rounded-full bg-yellow-500';
+      statusText.textContent = 'Atualizando...';
+      try {
+        const resp = await fetch(`/dashboard/update-prices/${portfolioId}`, { method: 'POST' });
+        const data = await resp.json();
+        statusDot.className = 'inline-block w-2 h-2 rounded-full bg-green-500';
+        statusText.textContent = data.error_count > 0 ? `${data.updated_count}/${data.updated_count + data.error_count} OK` : 'Atualizado';
+        setTimeout(() => window.location.reload(), 800);
+      } catch (e) {
+        statusDot.className = 'inline-block w-2 h-2 rounded-full bg-red-500';
+        statusText.textContent = 'Erro';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function setDashboardTemplate(template) {
+      try {
+        await fetch(`/dashboard/template/${portfolioId}`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ template })
+        });
+        const routes = {
+          v1: `/dashboard?portfolio_id=${portfolioId}`,
+          v2: `/dashboard/preview?portfolio_id=${portfolioId}`,
+          v3: `/dashboard/preview-v3?portfolio_id=${portfolioId}`
+        };
+        window.location.href = routes[template] || routes.v1;
+      } catch (e) {
+        alert('Erro ao trocar template');
+      }
+    }
+
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+    function openEditPortfolioModal() { document.getElementById('editPortfolioModal').classList.remove('hidden'); }
+    function openAddAssetModal() { document.getElementById('addAssetModal').classList.remove('hidden'); document.getElementById('addAssetForm').reset(); }
+    function openEditAssetModal(id, name, ticker, qty, targetPct, price) {
+      document.getElementById('edit_asset_id').value = id;
+      document.getElementById('edit_asset_ticker').value = ticker;
+      document.getElementById('edit_asset_ticker_display').textContent = ticker;
+      document.getElementById('edit_asset_quantity').value = qty;
+      document.getElementById('edit_asset_target_pct').value = targetPct;
+      document.getElementById('edit_asset_price').value = price > 0 ? price : '';
+      document.getElementById('editAssetModal').classList.remove('hidden');
+    }
+
+    function parseNumber(val) {
+      if (!val) return 0;
+      return parseFloat(String(val).trim().replace(/,/g, '.')) || 0;
+    }
+
+    document.getElementById('editPortfolioForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('edit_portfolio_name').value.trim();
+      const value = parseNumber(document.getElementById('edit_portfolio_value').value);
+      const curr = document.getElementById('edit_portfolio_currency').value;
+      try {
+        const resp = await fetch(`/portfolios/${portfolioId}`, {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ name, total_value: value, currency: curr, description: '' })
+        });
+        if (!resp.ok) throw new Error((await resp.json()).detail);
+        window.location.reload();
+      } catch (e) { alert('Erro: ' + e.message); }
+    });
+
+    document.getElementById('addAssetForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const ticker = document.getElementById('add_ticker').value.trim().toUpperCase();
+      const name = document.getElementById('add_name').value.trim() || ticker;
+      const classId = parseInt(document.getElementById('add_class').value);
+      let qty = parseNumber(document.getElementById('add_quantity').value);
+      const targetPct = parseNumber(document.getElementById('add_target_pct').value);
+      if (!ticker || !classId || targetPct <= 0) {
+        alert('Preencha todos os campos corretamente');
+        return;
+      }
+      if (!qty || qty <= 0) {
+        const resp = await fetch('/assets/suggest-quantity', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ portfolio_id: portfolioId, asset_class_id: classId, ticker, target_pct_class: targetPct })
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          qty = data.quantity || 0;
+          if (qty > 0) document.getElementById('add_quantity').value = qty.toFixed(4);
+        }
+      }
+      if (!qty || qty <= 0) { alert('Não foi possível calcular a quantidade. Informe manualmente.'); return; }
+      try {
+        const valResp = await fetch(`/search/validate/${ticker}`);
+        const valData = await valResp.json();
+        if (!valData.valid) { alert('Ticker inválido: ' + valData.error); return; }
+        let assetId;
+        const existResp = await fetch(`/assets/ticker/${ticker}?asset_class_id=${classId}`);
+        if (existResp.ok) {
+          assetId = (await existResp.json()).id;
+        } else {
+          const createResp = await fetch('/assets/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ name, ticker, source: 'manual', asset_class_id: classId })
+          });
+          if (!createResp.ok) throw new Error((await createResp.json()).detail);
+          assetId = (await createResp.json()).id;
+        }
+        const paResp = await fetch(`/portfolio-assets/?portfolio_id=${portfolioId}`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ asset_id: assetId, quantity: qty, target_percentage: targetPct, rebalance_threshold_percentage: 5.0 })
+        });
+        if (!paResp.ok) throw new Error((await paResp.json()).detail);
+        window.location.reload();
+      } catch (e) { alert('Erro: ' + e.message); }
+    });
+
+    document.getElementById('editAssetForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('edit_asset_id').value;
+      const ticker = document.getElementById('edit_asset_ticker').value;
+      const qty = parseNumber(document.getElementById('edit_asset_quantity').value);
+      const targetPct = parseNumber(document.getElementById('edit_asset_target_pct').value);
+      const price = parseNumber(document.getElementById('edit_asset_price').value);
+      try {
+        const resp = await fetch(`/portfolio-assets/${id}`, {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ quantity: qty, target_percentage: targetPct })
+        });
+        if (!resp.ok) throw new Error((await resp.json()).detail);
+        if (price > 0) {
+          await fetch(`/assets/update-price/${ticker}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ price })
+          });
+        }
+        window.location.reload();
+      } catch (e) { alert('Erro: ' + e.message); }
+    });
+
+    async function confirmDeleteAsset(id, ticker) {
+      if (!confirm(`Remover ${ticker} da carteira?`)) return;
+      try {
+        await fetch(`/portfolio-assets/${id}`, { method: 'DELETE' });
+        window.location.reload();
+      } catch (e) { alert('Erro: ' + e.message); }
+    }
+
+    let autoRefreshInterval = null;
+    let sortState = {};
+
+    function startAutoRefresh() {
+      autoRefreshInterval = setInterval(updatePrices, 60000);
+    }
+
+    function toggleAllClasses() {
+      document.querySelectorAll('.asset-class-group').forEach(d => {
+        d.open = !d.open;
+      });
+    }
+
+    function sortTable(classId, column) {
+      const tbody = document.querySelector(`details[data-class-id="${classId}"] tbody`);
+      if (!tbody) return;
+      const rows = Array.from(tbody.querySelectorAll('.asset-row'));
+      if (!sortState[classId]) sortState[classId] = {};
+      const asc = sortState[classId].col === column ? !sortState[classId].asc : true;
+      sortState[classId] = { col: column, asc };
+      rows.sort((a, b) => {
+        let valA = a.dataset[column] || '';
+        let valB = b.dataset[column] || '';
+        const numA = parseFloat(valA);
+        const numB = parseFloat(valB);
+        if (!isNaN(numA) && !isNaN(numB)) return asc ? numA - numB : numB - numA;
+        valA = valA.toLowerCase(); valB = valB.toLowerCase();
+        return asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      });
+      rows.forEach(r => tbody.appendChild(r));
+    }
+
+    function applyFilters() {
+      const search = document.getElementById('globalSearch').value.toLowerCase();
+      const statusFilter = document.getElementById('filterStatus').value;
+      document.querySelectorAll('.asset-row').forEach(row => {
+        const name = (row.dataset.name || '').toLowerCase();
+        const ticker = (row.dataset.ticker || '').toLowerCase();
+        const status = row.dataset.status || '';
+        const matchSearch = !search || name.includes(search) || ticker.includes(search);
+        const matchStatus = !statusFilter || status === statusFilter;
+        row.style.display = matchSearch && matchStatus ? '' : 'none';
+      });
+    }
+
+    function clearFilters() {
+      document.getElementById('globalSearch').value = '';
+      document.getElementById('filterStatus').value = '';
+      applyFilters();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      startAutoRefresh();
+    });
+  </script>
+</body>
+</html>

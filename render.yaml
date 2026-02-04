@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: portfolio-manager
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:////var/data/portfoliomanager.db
+      - key: OCR_CMD
+        value: /usr/bin/tesseract
+      - key: OCR_LANG
+        value: eng+por
+      - key: COOKIE_SAMESITE
+        value: lax
+      - key: COOKIE_SECURE
+        value: "true"
+    disks:
+      - name: portfolio-data
+        mountPath: /var/data
+        sizeGB: 1
