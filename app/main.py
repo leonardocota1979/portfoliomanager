@@ -16,7 +16,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Importa módulos do app
-from .database import create_db_and_tables
+from .database import create_db_and_tables, SessionLocal
+from . import crud, schemas
 from .services.price_service import get_price_service
 
 # Importa todos os routers
@@ -38,6 +39,28 @@ load_dotenv()
 
 # Cria tabelas do banco de dados ao iniciar
 create_db_and_tables()
+
+# Bootstrap admin user from env (only if not exists)
+def _bootstrap_admin():
+    import os
+    username = os.getenv("ADMIN_BOOTSTRAP_USER")
+    password = os.getenv("ADMIN_BOOTSTRAP_PASS")
+    email = os.getenv("ADMIN_BOOTSTRAP_EMAIL")
+    if not username or not password or not email:
+        return
+    db = SessionLocal()
+    try:
+        existing = crud.get_user_by_username(db, username)
+        if existing:
+            return
+        user = schemas.UserCreate(username=username, email=email, password=password)
+        created = crud.create_user(db, user)
+        created.is_admin = True
+        db.commit()
+    finally:
+        db.close()
+
+_bootstrap_admin()
 
 # Inicializa FastAPI
 app = FastAPI(

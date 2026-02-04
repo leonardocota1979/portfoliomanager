@@ -25,6 +25,9 @@ No painel do serviço, adicione:
 - `SECRET_KEY` (obrigatório)
 - `FINNHUB_KEY`
 - `ALPHAVANTAGE_KEY`
+- `ADMIN_BOOTSTRAP_USER`
+- `ADMIN_BOOTSTRAP_PASS`
+- `ADMIN_BOOTSTRAP_EMAIL`
 
 ### 4) Banco de dados
 **Rápido (SQLite em disco)**  

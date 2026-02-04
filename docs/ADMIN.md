@@ -25,6 +25,14 @@ Recursos adicionais:
 - Paginação
 - Proteção contra remoção do próprio admin logado
 
+## Bootstrap de admin (produção)
+Se o ambiente estiver vazio, defina no deploy:
+- `ADMIN_BOOTSTRAP_USER`
+- `ADMIN_BOOTSTRAP_PASS`
+- `ADMIN_BOOTSTRAP_EMAIL`
+
+O sistema cria o admin automaticamente na primeira subida.
+
 ## Segurança
 Recomendações:
 - Defina `COOKIE_SECURE=true` em produção
