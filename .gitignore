@@ -25,6 +25,8 @@ env/
 # Portfolio Manager
 # ═══════════════════════════════════════════════════════════════════
 logs/
+var/
+data/
 backups/
 *.db
 *.db-journal
