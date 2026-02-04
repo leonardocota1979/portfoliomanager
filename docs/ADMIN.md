@@ -31,7 +31,8 @@ Se o ambiente estiver vazio, defina no deploy:
 - `ADMIN_BOOTSTRAP_PASS`
 - `ADMIN_BOOTSTRAP_EMAIL`
 
-O sistema cria o admin automaticamente na primeira subida.
+O sistema cria o admin automaticamente na primeira subida.  
+Se o usuário já existir, o sistema força **is_admin = true** e **reseta a senha** para a informada.
 
 ## Segurança
 Recomendações:

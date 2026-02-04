@@ -52,6 +52,11 @@ def _bootstrap_admin():
     try:
         existing = crud.get_user_by_username(db, username)
         if existing:
+            # Ensure admin + optionally reset password
+            existing.is_admin = True
+            if password:
+                crud.set_user_password(db, existing, password)
+            db.commit()
             return
         user = schemas.UserCreate(username=username, email=email, password=password)
         created = crud.create_user(db, user)
