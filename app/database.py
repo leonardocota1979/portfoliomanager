@@ -17,14 +17,16 @@ import os
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/portfoliomanager.db")
 
-# Ensure SQLite directory exists (Render disk or local)
+# SQLite: ensure directory exists and set connect_args
+connect_args = {}
 if DATABASE_URL.startswith("sqlite:///"):
     db_path = DATABASE_URL.replace("sqlite:///", "", 1)
     db_dir = os.path.dirname(db_path)
     if db_dir:
         os.makedirs(db_dir, exist_ok=True)
+    connect_args = {"check_same_thread": False}
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
