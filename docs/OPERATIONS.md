@@ -13,7 +13,7 @@ pip install -r requirements.txt
 
 ## Variáveis de ambiente
 No `.env`:
-- `DATABASE_URL` (SQLite)
+- `DATABASE_URL` (SQLite por padrão; pode apontar para Postgres)
 - `FINNHUB_KEY`
 - `ALPHAVANTAGE_KEY`
 - `OCR_LANG`
@@ -40,6 +40,9 @@ Variáveis principais (já no `render.yaml`):
 - `OCR_CMD=/usr/bin/tesseract`
 - `OCR_LANG=eng+por`
 
+Para usar **Postgres no Render**, defina `DATABASE_URL` no painel do serviço
+(isso sobrescreve o valor do `render.yaml`).
+
 Para um guia completo de produção, veja `docs/PRODUCTION.md`.
 
 ## Banco de dados
@@ -48,6 +51,14 @@ Local padrão:
 data/portfoliomanager.db
 ```
 Se mover o arquivo, ajuste `DATABASE_URL` no `.env`.
+
+Para usar o **Postgres do Render localmente**:
+1. Copie o **External Database URL** no Render.
+2. No `.env` local:
+   ```
+   DATABASE_URL=postgresql://...
+   ```
+3. Rode o app normalmente.
 
 ## Onde ficam as coisas (atalhos rápidos)
 - **Configuração**: `.env`
