@@ -287,20 +287,33 @@ async def suggest_quantity(
     target_value = (target_pct_class / 100.0) * class_target_value
 
     if target_value <= 0:
-        return {"quantity": 0, "price": 0, "source": "", "target_value": 0}
+        return {
+            "quantity": 0,
+            "price": 0,
+            "source": "",
+            "target_value": 0,
+            "reason": "target_value_zero"
+        }
 
     price_service = get_price_service()
     price, sources, _ = await price_service.get_price_consensus(ticker)
 
     if not price or price <= 0:
-        return {"quantity": 0, "price": 0, "source": "", "target_value": target_value}
+        return {
+            "quantity": 0,
+            "price": 0,
+            "source": "",
+            "target_value": target_value,
+            "reason": "price_not_found"
+        }
 
     quantity = target_value / price
     return {
         "quantity": quantity,
         "price": price,
         "source": sources,
-        "target_value": target_value
+        "target_value": target_value,
+        "reason": ""
     }
 
 

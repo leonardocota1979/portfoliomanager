@@ -508,6 +508,24 @@
         return parseFloat(String(val).trim().replace(/,/g, '.')) || 0;
     }
 
+    let lastSuggestReason = '';
+
+    function explainSuggestFailure(reason, ticker) {
+        if (reason === 'target_value_zero') {
+            alert('Defina o Valor Total da carteira e a meta da classe para calcular automaticamente.');
+            return;
+        }
+        if (reason === 'price_not_found') {
+            alert(`Preço não encontrado para ${ticker}. Informe a quantidade manualmente.`);
+            return;
+        }
+        if (reason === 'request_failed') {
+            alert('Não foi possível calcular agora. Tente novamente ou informe manualmente.');
+            return;
+        }
+        alert('Não foi possível calcular a quantidade. Informe manualmente.');
+    }
+
     async function autoFillQuantityIfEmpty() {
         const qtyEl = document.getElementById('add_quantity');
         const targetPctEl = document.getElementById('add_target_pct');
@@ -523,6 +541,7 @@
         if (!ticker || !classId || targetPct <= 0) return;
 
         try {
+            lastSuggestReason = '';
             const resp = await fetch('/assets/suggest-quantity', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -533,12 +552,17 @@
                     target_pct_class: targetPct
                 })
             });
-            if (!resp.ok) return;
+            if (!resp.ok) {
+                lastSuggestReason = 'request_failed';
+                return;
+            }
             const data = await resp.json();
+            lastSuggestReason = data.reason || '';
             if (data.quantity && data.quantity > 0) {
                 qtyEl.value = data.quantity.toFixed(4);
             }
         } catch (e) {
+            lastSuggestReason = 'request_failed';
             console.warn('autoFillQuantity error', e);
         }
     }
@@ -580,7 +604,7 @@
             qty = parseNumber(document.getElementById('add_quantity').value);
         }
         if (!qty || qty <= 0) {
-            alert('Não foi possível calcular a quantidade. Informe manualmente.');
+            explainSuggestFailure(lastSuggestReason, ticker);
             return;
         }
         
