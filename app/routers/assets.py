@@ -283,7 +283,16 @@ async def suggest_quantity(
     if not asset_class:
         raise HTTPException(status_code=404, detail="Classe não encontrada")
 
-    class_target_value = (asset_class.target_percentage / 100.0) * (portfolio.total_value or 0.0)
+    portfolio_total = portfolio.total_value or 0.0
+    class_target_pct = asset_class.target_percentage or 0.0
+    class_target_value = (class_target_pct / 100.0) * portfolio_total
+
+    used_fallback = False
+    if class_target_value <= 0 and portfolio_total > 0:
+        # Fallback: se a classe não tem meta definida, usa o total do portfólio
+        class_target_value = portfolio_total
+        used_fallback = True
+
     target_value = (target_pct_class / 100.0) * class_target_value
 
     if target_value <= 0:
@@ -292,7 +301,11 @@ async def suggest_quantity(
             "price": 0,
             "source": "",
             "target_value": 0,
-            "reason": "target_value_zero"
+            "reason": "target_value_zero",
+            "portfolio_total_value": portfolio_total,
+            "class_target_percentage": class_target_pct,
+            "class_target_value": class_target_value,
+            "used_fallback": used_fallback
         }
 
     price_service = get_price_service()
@@ -304,7 +317,11 @@ async def suggest_quantity(
             "price": 0,
             "source": "",
             "target_value": target_value,
-            "reason": "price_not_found"
+            "reason": "price_not_found",
+            "portfolio_total_value": portfolio_total,
+            "class_target_percentage": class_target_pct,
+            "class_target_value": class_target_value,
+            "used_fallback": used_fallback
         }
 
     quantity = target_value / price
@@ -313,7 +330,11 @@ async def suggest_quantity(
         "price": price,
         "source": sources,
         "target_value": target_value,
-        "reason": ""
+        "reason": "fallback_portfolio" if used_fallback else "",
+        "portfolio_total_value": portfolio_total,
+        "class_target_percentage": class_target_pct,
+        "class_target_value": class_target_value,
+        "used_fallback": used_fallback
     }
 
 

@@ -542,6 +542,10 @@
         alert(`Preço não encontrado para ${ticker}. Informe a quantidade manualmente.`);
         return;
       }
+      if (reason === 'fallback_portfolio') {
+        alert('Classe sem meta definida. Usando % do portfólio para calcular a quantidade.');
+        return;
+      }
       if (reason === 'request_failed') {
         alert('Não foi possível calcular agora. Tente novamente ou informe manualmente.');
         return;
