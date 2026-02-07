@@ -16,8 +16,23 @@ O **Portfolio Manager** é uma aplicação web baseada em **FastAPI** que permit
   - `import_service.py`: OCR e parsing de prints.
 - **Banco de dados (SQLite)**: persistência de portfólios, classes, ativos e preços.
 
+## Padrão arquitetural adotado
+O sistema evoluiu para um **Monólito Modular** com separação por camadas:
+- **Interface**: `app/routers/` + `app/templates/`
+- **Aplicação (casos de uso)**: `app/application/`
+- **Domínio/Persistência**: `app/crud.py` + `app/database.py`
+- **Infraestrutura externa**: `app/services/` (APIs de preço e OCR)
+- **Configuração central**: `app/core/settings.py`
+
+Benefícios:
+- mudanças pequenas tendem a afetar apenas um módulo;
+- menor acoplamento entre HTTP e regra de negócio;
+- migração futura para serviços separados fica mais simples.
+
 ## Estrutura de pastas
 - `app/`
+  - `core/`: configuração central e paths operacionais
+  - `application/`: casos de uso de negócio (ex.: portfólios)
   - `routers/`: rotas HTTP (dashboard, import, assets, etc.)
   - `services/`: serviços externos (preço, OCR)
   - `templates/`: HTML com Jinja2

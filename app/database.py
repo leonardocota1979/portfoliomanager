@@ -1,11 +1,11 @@
 # app/database.py
 """
-Modelos do Banco de Dados - VERSÃO ATUALIZADA
+Camada de dados principal da aplicação.
 
-Mudanças:
-- Adicionado campos de preço em Asset (last_price, last_price_updated, price_source)
-- Adicionado last_prices_updated em Portfolio
-- Cascade delete em todos os relacionamentos
+Pontos importantes para operação:
+- Usa `DATABASE_URL` do ambiente.
+- Suporta SQLite (local) e Postgres (Render/produção).
+- Cria automaticamente diretório do arquivo SQLite quando necessário.
 """
 
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Boolean, UniqueConstraint
@@ -13,17 +13,19 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 
-import os
+from .core.settings import get_settings
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/portfoliomanager.db")
+SETTINGS = get_settings()
+DATABASE_URL = SETTINGS.database_url
 
-# SQLite: ensure directory exists and set connect_args
+# SQLite: cria diretório local e aplica connect_args específicos.
 connect_args = {}
 if DATABASE_URL.startswith("sqlite:///"):
     db_path = DATABASE_URL.replace("sqlite:///", "", 1)
-    db_dir = os.path.dirname(db_path)
+    from pathlib import Path
+    db_dir = Path(db_path).parent
     if db_dir:
-        os.makedirs(db_dir, exist_ok=True)
+        db_dir.mkdir(parents=True, exist_ok=True)
     connect_args = {"check_same_thread": False}
 
 engine = create_engine(DATABASE_URL, connect_args=connect_args)

@@ -24,3 +24,17 @@ Verifique:
 - chaves de API válidas
 - ticker correto
 - conexão internet
+
+## Erro com Postgres no deploy/local
+Sintoma comum:
+- `ModuleNotFoundError: No module named 'psycopg2'`
+
+Causa:
+- dependências de produção não instaladas no ambiente local.
+
+Solução:
+```bash
+pip install -r requirements.txt
+```
+
+No Render, confirme se o deploy foi feito após atualizar `requirements.txt`.

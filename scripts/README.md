@@ -1,21 +1,25 @@
 # Scripts
 
-Estrutura de scripts organizada do Portfolio Manager.
+Organização padrão de automações e utilitários do projeto.
 
-Gerado automaticamente em: 2026-01-26 16:48:11
+## `setup/`
+Scripts de bootstrap e correções iniciais de ambiente.
 
-## setup/
-Scripts de instalação e configuração inicial do projeto
+## `dev/`
+Ferramentas de desenvolvimento (diagnóstico e utilitários locais).
 
-## dev/
-Scripts para desenvolvimento (iniciar servidor, resetar DB)
+## `maintenance/`
+Manutenção operacional (migrações de suporte, usuários, backup/restore).
 
-## maintenance/
-Scripts de manutenção (backup, limpeza de logs)
+Arquivos principais:
+- `scripts/maintenance/housekeeping.sh`: limpeza segura de temporários (dry-run por padrão).
+- `scripts/maintenance/backup_postgres.sh`: backup de Postgres para `var/backups/postgres/`.
+- `scripts/maintenance/restore_postgres.sh`: restore de dump Postgres.
 
-## old/
-Scripts antigos movidos da raiz do projeto
+## `migrations/`
+Migrações pontuais em SQLite para compatibilidade retroativa.
 
-## docs/
-Documentação sobre como usar cada script
-
+## Regras de uso
+- Execute sempre da raiz do projeto.
+- Em produção, prefira migrações idempotentes e scripts sem efeitos destrutivos.
+- Backups de Postgres devem sair em `var/backups/postgres/`.

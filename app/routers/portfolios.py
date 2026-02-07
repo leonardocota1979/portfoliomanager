@@ -12,13 +12,15 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
-from .. import crud, schemas
+from .. import schemas
 from ..database import get_db, User as UserModel
 from ..dependencies import get_current_active_user
+from ..application.portfolios import PortfolioUseCases
 
 router = APIRouter(
     tags=["Portfolios"]
 )
+portfolio_use_cases = PortfolioUseCases()
 
 
 @router.get("/list", response_class=HTMLResponse)
@@ -29,7 +31,7 @@ async def list_portfolios_page(
 ):
     """Renderiza a página HTML que lista as carteiras."""
     from ..main import templates
-    portfolios = crud.get_portfolios_by_user(db, user_id=current_user.id)
+    portfolios = portfolio_use_cases.list_by_user(db=db, user=current_user)
     return templates.TemplateResponse(
         "portfolio_list.html",
         {
@@ -76,7 +78,7 @@ def create_portfolio(
     db: Session = Depends(get_db)
 ):
     """Cria um novo portfolio."""
-    return crud.create_portfolio(db=db, portfolio=portfolio, user_id=current_user.id)
+    return portfolio_use_cases.create(db=db, user=current_user, payload=portfolio)
 
 
 @router.get("/", response_model=List[schemas.Portfolio])
@@ -87,7 +89,7 @@ def read_portfolios(
     db: Session = Depends(get_db)
 ):
     """Lista todos os portfolios do usuário."""
-    portfolios = crud.get_portfolios_by_user(db, user_id=current_user.id, skip=skip, limit=limit)
+    portfolios = portfolio_use_cases.list_by_user(db=db, user=current_user, skip=skip, limit=limit)
     return portfolios
 
 
@@ -98,8 +100,7 @@ def read_portfolio(
     db: Session = Depends(get_db)
 ):
     """Busca um portfolio específico."""
-    from ..dependencies import verify_portfolio_ownership
-    portfolio = verify_portfolio_ownership(portfolio_id, current_user, db)
+    portfolio = portfolio_use_cases.get_owned(db=db, user=current_user, portfolio_id=portfolio_id)
     return portfolio
 
 
@@ -119,18 +120,12 @@ def update_portfolio(
     - total_value (valor definido pelo usuário)
     - currency
     """
-    from ..dependencies import verify_portfolio_ownership
-    db_portfolio = verify_portfolio_ownership(portfolio_id, current_user, db)
-    
-    # Atualiza todos os campos
-    db_portfolio.name = portfolio.name
-    db_portfolio.description = portfolio.description
-    db_portfolio.total_value = portfolio.total_value
-    db_portfolio.currency = portfolio.currency
-    
-    db.commit()
-    db.refresh(db_portfolio)
-    return db_portfolio
+    return portfolio_use_cases.update_owned(
+        db=db,
+        user=current_user,
+        portfolio_id=portfolio_id,
+        payload=portfolio
+    )
 
 
 @router.delete("/{portfolio_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -140,8 +135,5 @@ def delete_portfolio(
     db: Session = Depends(get_db)
 ):
     """Deleta um portfolio e todos os dados relacionados (cascade)."""
-    from ..dependencies import verify_portfolio_ownership
-    db_portfolio = verify_portfolio_ownership(portfolio_id, current_user, db)
-    db.delete(db_portfolio)
-    db.commit()
+    portfolio_use_cases.delete_owned(db=db, user=current_user, portfolio_id=portfolio_id)
     return None

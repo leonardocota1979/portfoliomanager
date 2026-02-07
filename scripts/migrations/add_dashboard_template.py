@@ -1,12 +1,22 @@
-"""Adiciona coluna dashboard_template em portfolios (SQLite)."""
+"""Adiciona coluna `dashboard_template` em `portfolios` (somente SQLite)."""
 
-import sqlite3
 import os
+import sqlite3
+from pathlib import Path
 
-DB_PATH = os.getenv("DATABASE_URL", "sqlite:///./portfoliomanager.db")
+try:
+    from app.core.settings import get_settings
+    DATABASE_URL = get_settings().database_url
+except Exception:
+    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/portfoliomanager.db")
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-if DB_PATH.startswith("sqlite:///"):
-    DB_PATH = DB_PATH.replace("sqlite:///", "")
+if not DATABASE_URL.startswith("sqlite:///"):
+    raise SystemExit("Este script atende apenas SQLite. Use migração SQLAlchemy para Postgres.")
+
+DB_PATH = DATABASE_URL.replace("sqlite:///", "", 1)
+Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
 
 
 def column_exists(cursor, table, column):

@@ -20,6 +20,7 @@ import asyncio
 from datetime import datetime
 from typing import Optional, Dict, List, Tuple
 import re
+from app.core.settings import get_settings
 
 
 class PriceService:
@@ -616,13 +617,13 @@ def get_price_service(
     global _price_service
     
     if _price_service is None:
-        import os
+        settings = get_settings()
         _price_service = PriceService(
-            finnhub_key=finnhub_key or os.getenv('FINNHUB_KEY'),
-            alphavantage_key=alphavantage_key or os.getenv('ALPHAVANTAGE_KEY'),
-            brapi_token=brapi_token or os.getenv('BRAPI_TOKEN'),
-            twelvedata_key=twelvedata_key or os.getenv('TWELVEDATA_KEY'),
-            fmp_key=fmp_key or os.getenv('FMP_KEY')
+            finnhub_key=finnhub_key or settings.finnhub_key,
+            alphavantage_key=alphavantage_key or settings.alphavantage_key,
+            brapi_token=brapi_token or settings.brapi_token,
+            twelvedata_key=twelvedata_key or settings.twelvedata_key,
+            fmp_key=fmp_key or settings.fmp_key
         )
     
     return _price_service

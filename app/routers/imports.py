@@ -27,10 +27,12 @@ from app.database import (
 from app.dependencies import get_current_active_user
 from app.services.import_service import run_tesseract, parse_positions, detect_currency, TOP_CURRENCIES, imp_logger
 from app.services.price_service import get_price_service
+from app.core.settings import get_settings
 import difflib
 
 router = APIRouter(prefix="/imports", tags=["Imports"])
 templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
+SETTINGS = get_settings()
 
 
 def _save_upload(upload: UploadFile, dest_dir: Path) -> Path:
@@ -121,7 +123,7 @@ async def import_preview(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_active_user)
 ):
-    upload_dir = Path("var/logs") / "uploads"
+    upload_dir = SETTINGS.upload_dir
     path = _save_upload(file, upload_dir)
     imp_logger.info("preview upload=%s source=%s portfolio_id=%s", path, source, portfolio_id)
 

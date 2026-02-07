@@ -6,7 +6,6 @@ Data: 26 de janeiro de 2026
 """
 
 from datetime import timedelta
-import os
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Form
@@ -22,8 +21,10 @@ from ..dependencies import (
     Token,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
+from ..core.settings import get_settings
 
 router = APIRouter()
+SETTINGS = get_settings()
 
 
 def authenticate_user(db: Session, username: str, password: str):
@@ -110,8 +111,8 @@ async def login_for_access_token_html(
         value=f"Bearer {access_token}",
         httponly=True,  # Protege contra XSS
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Em segundos
-        samesite=os.getenv("COOKIE_SAMESITE", "lax"),
-        secure=os.getenv("COOKIE_SECURE", "false").lower() == "true"
+        samesite=SETTINGS.cookie_samesite,
+        secure=SETTINGS.cookie_secure
     )
     
     return response

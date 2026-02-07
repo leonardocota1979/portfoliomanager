@@ -5,6 +5,8 @@ Este diretório reúne toda a documentação do sistema, organizada por tema.
 ## Índice
 - **Visão geral e arquitetura**
   - `ARCHITECTURE.md`
+- **Estrutura e padrões de diretórios**
+  - `STRUCTURE.md`
 - **Guia do usuário (funcionalidades)**
   - `USER_GUIDE.md`
 - **Guia de operação (como subir, configurar, backup, logs)**

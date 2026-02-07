@@ -14,9 +14,14 @@ from pathlib import Path
 from typing import List, Optional, Dict, Tuple
 
 import logging
+from app.core.settings import get_settings
 
 
-LOG_DIR = Path("var/logs")
+SETTINGS = get_settings()
+
+# Diretório único de logs operacionais do projeto.
+# Mantido em `var/logs` para separar runtime, dados e código.
+LOG_DIR = SETTINGS.log_dir
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 ocr_logger = logging.getLogger("import_ocr")
@@ -73,7 +78,7 @@ CURRENCY_HINTS = {
 
 def _resolve_tesseract_cmd() -> Optional[str]:
     """Resolve o binário do tesseract em ambientes macOS."""
-    env_cmd = os.getenv("OCR_CMD")
+    env_cmd = SETTINGS.ocr_cmd
     if env_cmd:
         return env_cmd
     found = shutil.which("tesseract")
@@ -90,7 +95,7 @@ def run_tesseract(image_path: Path) -> str:
     """
     Executa OCR via Tesseract e retorna o texto.
     """
-    lang = os.getenv("OCR_LANG", "eng")
+    lang = SETTINGS.ocr_lang
     tesseract_cmd = _resolve_tesseract_cmd()
     if not tesseract_cmd:
         ocr_logger.error("OCR erro: tesseract não encontrado no PATH. Defina OCR_CMD.")

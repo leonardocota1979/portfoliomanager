@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from dotenv import load_dotenv
+from .core.settings import get_settings
 
 # Importa módulos do app
 from .database import create_db_and_tables, SessionLocal, GlobalAssetClass
@@ -34,8 +35,13 @@ from .routers import (
     imports
 )
 
-# Carrega variáveis de ambiente (.env)
+# Ordem de inicialização:
+# 1) carregar ambiente
+# 2) garantir schema
+# 3) seed de classes globais
+# 4) bootstrap admin (quando configurado via env)
 load_dotenv()
+SETTINGS = get_settings()
 
 # Cria tabelas do banco de dados ao iniciar
 create_db_and_tables()
@@ -65,10 +71,10 @@ _seed_global_classes()
 
 # Bootstrap admin user from env (only if not exists)
 def _bootstrap_admin():
-    import os
-    username = os.getenv("ADMIN_BOOTSTRAP_USER")
-    password = os.getenv("ADMIN_BOOTSTRAP_PASS")
-    email = os.getenv("ADMIN_BOOTSTRAP_EMAIL")
+    username = SETTINGS.admin_bootstrap_user
+    password = SETTINGS.admin_bootstrap_pass
+    email = SETTINGS.admin_bootstrap_email
+    # Sem as 3 variáveis de bootstrap, a rotina é ignorada de forma segura.
     if not username or not password or not email:
         return
     db = SessionLocal()

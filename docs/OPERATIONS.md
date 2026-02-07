@@ -19,6 +19,10 @@ No `.env`:
 - `OCR_LANG`
 - `OCR_CMD`
 
+Leitura centralizada:
+- Todas as variáveis são carregadas por `app/core/settings.py`.
+- Isso reduz inconsistência entre ambiente local e produção.
+
 ## Executar
 Use o script:
 ```bash
@@ -62,7 +66,9 @@ Para usar o **Postgres do Render localmente**:
 
 ## Onde ficam as coisas (atalhos rápidos)
 - **Configuração**: `.env`
+- **Configuração central em código**: `app/core/settings.py`
 - **Modelos e DB**: `app/database.py`
+- **Casos de uso (regra de negócio)**: `app/application/`
 - **Rotas HTTP**: `app/routers/`
 - **Templates (HTML)**: `app/templates/`
 - **Serviços (preços/OCR)**: `app/services/`
@@ -80,6 +86,25 @@ Arquivos runtime:
 var/.run/
 ```
 O script `devctl.sh` usa este caminho por padrão.
+
+## Housekeeping (limpeza segura)
+Script:
+```bash
+./scripts/maintenance/housekeeping.sh
+```
+
+Comportamento:
+- padrão: `dry-run` (apenas simula)
+- remoção real: `--apply`
+- logs de runtime: `--with-run-logs`
+- logs de aplicação/OCR: `--with-app-logs`
+- uploads temporários: `--with-upload-cache`
+- limitar por idade: `--older-than-days N`
+
+Exemplo recomendado:
+```bash
+./scripts/maintenance/housekeeping.sh --apply --with-upload-cache --older-than-days 7
+```
 
 ## Backup
 Sugestão simples:

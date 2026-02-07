@@ -8,6 +8,8 @@ Este guia cobre **deploy profissional** e **boas práticas mínimas**.
 3. HTTPS ativo (Render já fornece).
 4. Backup automático do banco.
 5. Logs acessíveis (Render ou VPS).
+6. Dependências atualizadas (`pip install -r requirements.txt` no build).
+7. Driver Postgres presente (`psycopg2-binary` em `requirements.txt`).
 
 ## Render — caminho rápido e profissional
 
@@ -41,6 +43,14 @@ Crie um Postgres no Render e **substitua** `DATABASE_URL` no painel do serviço.
 
 > Nota: se você definir `DATABASE_URL` no painel do Render, ele sobrescreve o valor do `render.yaml`.
 
+Formato recomendado:
+```env
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DBNAME
+```
+
+Compatibilidade:
+- Se o provedor entregar `postgres://...`, o sistema normaliza automaticamente para `postgresql://...` via `app/core/settings.py`.
+
 ### 4.1) Seed automático de classes globais
 No primeiro boot, o sistema cria classes globais padrão automaticamente
 (Stocks, Bonds, REITs, Crypto, Commodities, Reserva de Valor).
@@ -66,7 +76,7 @@ export PG_BACKUP_URL="postgresql://user:pass@host:5432/db"
 ### Restaurar
 ```bash
 export PG_BACKUP_URL="postgresql://user:pass@host:5432/db"
-./scripts/maintenance/restore_postgres.sh backups/postgres/portfoliomanager_YYYYMMDD_HHMMSS.dump
+./scripts/maintenance/restore_postgres.sh var/backups/postgres/portfoliomanager_YYYYMMDD_HHMMSS.dump
 ```
 
 ### 5) Deploy
@@ -82,7 +92,7 @@ Finalize o deploy e acesse a URL pública fornecida pelo Render.
 3. Restaure no novo Postgres:
    ```bash
    export PG_BACKUP_URL="postgresql://user:pass@novo-host:5432/novo-db"
-   ./scripts/maintenance/restore_postgres.sh backups/postgres/portfoliomanager_YYYYMMDD_HHMMSS.dump
+   ./scripts/maintenance/restore_postgres.sh var/backups/postgres/portfoliomanager_YYYYMMDD_HHMMSS.dump
    ```
 4. Atualize `DATABASE_URL` no ambiente de produção.
 5. Faça deploy.

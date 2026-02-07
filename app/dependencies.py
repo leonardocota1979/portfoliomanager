@@ -9,7 +9,6 @@ Data: 26 de janeiro de 2026
 
 from datetime import datetime, timedelta
 from typing import Optional, Annotated
-import os
 
 from fastapi import Depends, HTTPException, status, Cookie
 from fastapi.security import OAuth2PasswordBearer
@@ -17,18 +16,16 @@ from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from . import crud, database, schemas
+from .core.settings import get_settings
 
 # ==============================================================================
 # CONFIGURAÇÕES JWT
 # ==============================================================================
 
-SECRET_KEY = os.getenv("SECRET_KEY", "")
-ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
-
-if not SECRET_KEY:
-    # Evita crash em dev, mas força configuração em produção
-    SECRET_KEY = "dev-only-secret-change-me"
+SETTINGS = get_settings()
+SECRET_KEY = SETTINGS.secret_key
+ALGORITHM = SETTINGS.jwt_algorithm
+ACCESS_TOKEN_EXPIRE_MINUTES = SETTINGS.access_token_expire_minutes
 
 # OAuth2 scheme para extrair token do header Authorization
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token", auto_error=False)
