@@ -33,8 +33,12 @@ Arquivo `.env` (base em `.env.example`):
 
 ## Deploy Render
 - Arquivo `render.yaml` pronto para Web Service.
-- Para produção com Postgres: sobrescreva `DATABASE_URL` no painel do Render.
+- Para produção com Postgres compartilhado (General-db), configure no Render:
+  - `DATABASE_URL` = **Internal Database URL** do banco `General-db`
+  - `DB_SCHEMA=portfolio_manager`
+  - `ENFORCE_DB_SCHEMA=true`
 - Guia completo: `docs/PRODUCTION.md`.
+- Isolamento por schema: `docs/DB_ISOLATION.md`.
 
 ## Documentação
 - Índice geral: `docs/README.md`

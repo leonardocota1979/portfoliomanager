@@ -9,6 +9,7 @@ Pontos importantes para operação:
 """
 
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Boolean, UniqueConstraint
+from sqlalchemy import text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
@@ -17,6 +18,7 @@ from .core.settings import get_settings
 
 SETTINGS = get_settings()
 DATABASE_URL = SETTINGS.database_url
+DB_SCHEMA = SETTINGS.normalized_db_schema
 
 # SQLite: cria diretório local e aplica connect_args específicos.
 connect_args = {}
@@ -27,6 +29,9 @@ if DATABASE_URL.startswith("sqlite:///"):
     if db_dir:
         db_dir.mkdir(parents=True, exist_ok=True)
     connect_args = {"check_same_thread": False}
+elif DATABASE_URL.startswith("postgresql://"):
+    # Postgres compartilhado: fixa search_path no schema da aplicação.
+    connect_args = {"options": f"-csearch_path={DB_SCHEMA}"}
 
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -157,8 +162,41 @@ class AssetClassMapping(Base):
 
 
 def create_db_and_tables():
-    """Cria todas as tabelas no banco de dados."""
+    """
+    Cria/valida estrutura de banco.
+
+    Comportamento:
+    - SQLite: apenas cria tabelas.
+    - Postgres: cria schema alvo, valida schema ativo (se enforce) e cria tabelas.
+    """
+    if DATABASE_URL.startswith("postgresql://"):
+        _ensure_postgres_schema_ready()
     Base.metadata.create_all(bind=engine)
+
+
+def _ensure_postgres_schema_ready():
+    """
+    Garante isolamento por schema no Postgres compartilhado.
+
+    Passos:
+    1) CREATE SCHEMA IF NOT EXISTS <schema>
+    2) SET search_path para o schema do projeto
+    3) validar current_schema()
+    """
+    schema = DB_SCHEMA
+    quoted_schema = f'"{schema}"'
+
+    with engine.begin() as connection:
+        connection.execute(text(f"CREATE SCHEMA IF NOT EXISTS {quoted_schema}"))
+        connection.execute(text(f"SET search_path TO {quoted_schema}"))
+        active_schema = connection.execute(text("SELECT current_schema()")).scalar()
+
+        if SETTINGS.enforce_db_schema and active_schema != schema:
+            raise RuntimeError(
+                "Schema ativo divergente. "
+                f"Esperado='{schema}' Atual='{active_schema}'. "
+                "Revise DATABASE_URL/DB_SCHEMA/ENFORCE_DB_SCHEMA."
+            )
 
 
 def get_db():

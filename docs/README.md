@@ -21,6 +21,8 @@ Este diretório reúne toda a documentação do sistema, organizada por tema.
   - `GLOSSARY.md`
 - **Produção**
   - `PRODUCTION.md`
+- **Isolamento de schema no Postgres**
+  - `DB_ISOLATION.md`
 
 ## Referência rápida
 Veja `OPERATIONS.md` e `ARCHITECTURE.md` para:

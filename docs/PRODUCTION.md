@@ -30,6 +30,8 @@ No painel do serviço, adicione:
 - `ADMIN_BOOTSTRAP_USER`
 - `ADMIN_BOOTSTRAP_PASS`
 - `ADMIN_BOOTSTRAP_EMAIL`
+- `DB_SCHEMA=portfolio_manager`
+- `ENFORCE_DB_SCHEMA=true`
 
 ### 4) Banco de dados
 **Rápido (SQLite em disco)**  
@@ -41,6 +43,11 @@ sqlite:////var/data/portfoliomanager.db
 **Profissional (Postgres)**  
 Crie um Postgres no Render e **substitua** `DATABASE_URL` no painel do serviço.
 
+No cenário atual (banco já existente `General-db`):
+- `DATABASE_URL` = **Internal Database URL** do `General-db`
+- `DB_SCHEMA=portfolio_manager`
+- `ENFORCE_DB_SCHEMA=true`
+
 > Nota: se você definir `DATABASE_URL` no painel do Render, ele sobrescreve o valor do `render.yaml`.
 
 Formato recomendado:
@@ -50,6 +57,7 @@ DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DBNAME
 
 Compatibilidade:
 - Se o provedor entregar `postgres://...`, o sistema normaliza automaticamente para `postgresql://...` via `app/core/settings.py`.
+- O startup valida schema ativo com `current_schema()` quando `ENFORCE_DB_SCHEMA=true`.
 
 ### 4.1) Seed automático de classes globais
 No primeiro boot, o sistema cria classes globais padrão automaticamente

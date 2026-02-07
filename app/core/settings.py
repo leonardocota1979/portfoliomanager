@@ -10,6 +10,7 @@ Objetivos:
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -32,6 +33,24 @@ def _normalize_database_url(database_url: str) -> str:
     if database_url.startswith("postgres://"):
         return database_url.replace("postgres://", "postgresql://", 1)
     return database_url
+
+
+def _normalize_db_schema(schema: str) -> str:
+    """
+    Valida e normaliza identificador de schema.
+
+    Regras:
+    - Apenas letras, números e underscore.
+    - Primeiro caractere deve ser letra ou underscore.
+    """
+    normalized = (schema or "").strip()
+    if not normalized:
+        normalized = "portfolio_manager"
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", normalized):
+        raise ValueError(
+            "DB_SCHEMA inválido. Use apenas [a-zA-Z0-9_] e inicie com letra ou underscore."
+        )
+    return normalized
 
 
 def _default_sqlite_url(project_root: Path) -> str:
@@ -64,6 +83,13 @@ class AppSettings:
     upload_dir: Path
     ocr_cache_dir: Path
     backup_dir: Path
+    db_schema: str
+    enforce_db_schema: bool
+
+    @property
+    def normalized_db_schema(self) -> str:
+        """Schema validado e pronto para uso em SQL seguro (identificador simples)."""
+        return self.db_schema
 
     def ensure_runtime_dirs(self) -> None:
         """
@@ -79,6 +105,8 @@ def get_settings() -> AppSettings:
     project_root = Path(__file__).resolve().parents[2]
     default_db_url = _default_sqlite_url(project_root)
     database_url = _normalize_database_url(os.getenv("DATABASE_URL", default_db_url))
+    db_schema = _normalize_db_schema(os.getenv("DB_SCHEMA", "portfolio_manager"))
+    enforce_db_schema = _parse_bool(os.getenv("ENFORCE_DB_SCHEMA", "true"), default=True)
 
     settings = AppSettings(
         project_root=project_root,
@@ -104,7 +132,8 @@ def get_settings() -> AppSettings:
         upload_dir=(project_root / "var" / "logs" / "uploads"),
         ocr_cache_dir=(project_root / "var" / "logs" / "ocr"),
         backup_dir=(project_root / "var" / "backups" / "postgres"),
+        db_schema=db_schema,
+        enforce_db_schema=enforce_db_schema,
     )
     settings.ensure_runtime_dirs()
     return settings
-

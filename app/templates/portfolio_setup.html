@@ -51,6 +51,22 @@
     <!-- PASSO 2: Selecionar Classes -->
     <div id="step2" class="bg-white p-6 rounded-lg shadow-md mb-6 hidden">
         <h2 class="text-xl font-semibold mb-4">🎯 Passo 2: Selecionar Classes de Ativos</h2>
+
+        <div class="border rounded-lg p-4 mb-4 bg-gray-50">
+            <p class="text-sm text-gray-700 mb-3">
+                Você pode usar classes padrão e também criar classes personalizadas.
+            </p>
+            <div class="flex gap-2">
+                <input type="text" id="custom_class_name"
+                       class="flex-1 px-3 py-2 border rounded-md"
+                       placeholder="Nova classe personalizada (ex.: Reserva Tática)">
+                <button onclick="addCustomClass()"
+                        class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+                    + Adicionar classe
+                </button>
+            </div>
+            <p id="classes_error" class="text-sm text-red-600 mt-2 hidden"></p>
+        </div>
         
         <div id="classes_list" class="space-y-3 mb-6">
             <!-- Será preenchido via JavaScript -->
@@ -76,17 +92,59 @@
 </div>
 
 <script>
-let selectedClasses = [];
 let globalClasses = [];
+let selectedClasses = [];
+
+function classKeyFromName(name) {
+    return String(name || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '_')
+        .replace(/[^a-z0-9_]/g, '');
+}
+
+function showClassesError(message) {
+    const el = document.getElementById('classes_error');
+    if (!message) {
+        el.textContent = '';
+        el.classList.add('hidden');
+        return;
+    }
+    el.textContent = message;
+    el.classList.remove('hidden');
+}
+
+function buildSelectedClassesFromGlobal() {
+    selectedClasses = globalClasses.map(cls => ({
+        key: `g_${cls.id}`,
+        id: cls.id,
+        name: cls.name,
+        description: cls.description || '',
+        isCustom: false,
+        selected: false,
+        percentage: 0
+    }));
+}
 
 // Carrega classes globais
 async function loadGlobalClasses() {
-    const response = await fetch('/admin/global-classes/');
-    globalClasses = await response.json();
-    renderClassesStep2();
+    showClassesError('');
+    try {
+        const response = await fetch('/asset-classes/global-classes');
+        if (!response.ok) {
+            throw new Error(`Falha ao carregar classes padrão (${response.status})`);
+        }
+        globalClasses = await response.json();
+        buildSelectedClassesFromGlobal();
+        renderClassesStep2();
+    } catch (error) {
+        selectedClasses = [];
+        renderClassesStep2();
+        showClassesError('Não foi possível carregar classes padrão. Verifique login/permissão e tente novamente.');
+    }
 }
 
-function goToStep2() {
+async function goToStep2() {
     const name = document.getElementById('portfolio_name').value;
     const value = document.getElementById('total_value').value;
     
@@ -97,7 +155,7 @@ function goToStep2() {
     
     document.getElementById('step1').classList.add('hidden');
     document.getElementById('step2').classList.remove('hidden');
-    loadGlobalClasses();
+    await loadGlobalClasses();
 }
 
 function goToStep1() {
@@ -107,47 +165,107 @@ function goToStep1() {
 
 function renderClassesStep2() {
     const container = document.getElementById('classes_list');
-    container.innerHTML = globalClasses.map(cls => `
+    if (selectedClasses.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500">Nenhuma classe disponível no momento.</p>';
+        updateTotal();
+        return;
+    }
+
+    container.innerHTML = selectedClasses.map(cls => `
         <div class="border rounded-lg p-4">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <input type="checkbox" id="class_${cls.id}" 
-                           onchange="toggleClass(${cls.id}, '${cls.name}')"
+                    <input type="checkbox" id="class_${cls.key}" 
+                           ${cls.selected ? 'checked' : ''}
+                           onchange="toggleClass('${cls.key}')"
                            class="w-5 h-5">
-                    <label for="class_${cls.id}" class="font-medium">${cls.name}</label>
-                    <span class="text-sm text-gray-500">${cls.description}</span>
+                    <label for="class_${cls.key}" class="font-medium">${cls.name}</label>
+                    <span class="text-sm text-gray-500">${cls.description || ''}</span>
+                    ${cls.isCustom ? '<span class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded">Personalizada</span>' : ''}
                 </div>
-                <div class="flex items-center gap-2" id="input_${cls.id}" style="display:none;">
-                    <input type="number" id="percent_${cls.id}" 
+                <div class="flex items-center gap-2" id="input_${cls.key}" style="display:${cls.selected ? 'flex' : 'none'};">
+                    <input type="number" id="percent_${cls.key}" 
                            min="0" max="100" step="0.1" placeholder="0"
+                           value="${cls.percentage || ''}"
                            oninput="updateTotal()"
+                           ${cls.selected ? '' : 'disabled'}
                            class="w-24 px-3 py-2 border rounded-md">
                     <span>%</span>
+                    ${cls.isCustom ? `<button type="button" onclick="removeCustomClass('${cls.key}')" class="text-xs text-red-600 hover:text-red-800">Remover</button>` : ''}
                 </div>
             </div>
         </div>
     `).join('');
+    updateTotal();
 }
 
-function toggleClass(id, name) {
-    const checked = document.getElementById(`class_${id}`).checked;
-    const inputDiv = document.getElementById(`input_${id}`);
-    
+function toggleClass(key) {
+    const cls = selectedClasses.find(c => c.key === key);
+    if (!cls) return;
+    const checked = document.getElementById(`class_${key}`).checked;
+    const inputDiv = document.getElementById(`input_${key}`);
+    const percentInput = document.getElementById(`percent_${key}`);
+
+    cls.selected = checked;
     if (checked) {
         inputDiv.style.display = 'flex';
-        selectedClasses.push({id, name, percentage: 0});
+        percentInput.disabled = false;
     } else {
         inputDiv.style.display = 'none';
-        selectedClasses = selectedClasses.filter(c => c.id !== id);
-        document.getElementById(`percent_${id}`).value = '';
+        percentInput.disabled = true;
+        percentInput.value = '';
+        cls.percentage = 0;
     }
     updateTotal();
 }
 
+function addCustomClass() {
+    showClassesError('');
+    const input = document.getElementById('custom_class_name');
+    const rawName = (input.value || '').trim();
+    if (!rawName) {
+        showClassesError('Informe o nome da classe personalizada.');
+        return;
+    }
+
+    const normalizedNew = rawName.toLowerCase();
+    const alreadyExists = selectedClasses.some(c => c.name.toLowerCase() === normalizedNew);
+    if (alreadyExists) {
+        showClassesError('Já existe uma classe com este nome.');
+        return;
+    }
+
+    const keyBase = classKeyFromName(rawName) || 'custom';
+    let key = `c_${keyBase}`;
+    let seq = 1;
+    while (selectedClasses.some(c => c.key === key)) {
+        seq += 1;
+        key = `c_${keyBase}_${seq}`;
+    }
+
+    selectedClasses.push({
+        key,
+        id: null,
+        name: rawName,
+        description: 'Classe personalizada',
+        isCustom: true,
+        selected: true,
+        percentage: 0
+    });
+
+    input.value = '';
+    renderClassesStep2();
+}
+
+function removeCustomClass(key) {
+    selectedClasses = selectedClasses.filter(c => c.key !== key);
+    renderClassesStep2();
+}
+
 function updateTotal() {
     let total = 0;
-    selectedClasses.forEach(cls => {
-        const value = parseFloat(document.getElementById(`percent_${cls.id}`).value) || 0;
+    selectedClasses.filter(c => c.selected).forEach(cls => {
+        const value = parseFloat(document.getElementById(`percent_${cls.key}`).value) || 0;
         cls.percentage = value;
         total += value;
     });
@@ -175,19 +293,36 @@ async function createPortfolio() {
         });
         
         const portfolio = await response.json();
+        if (!response.ok) {
+            throw new Error(portfolio.detail || 'Erro ao criar portfolio');
+        }
+
+        const classesToCreate = selectedClasses.filter(c => c.selected && c.percentage > 0);
+        if (classesToCreate.length === 0) {
+            throw new Error('Selecione classes e defina percentuais maiores que zero.');
+        }
+
+        const uniqueNames = new Set(classesToCreate.map(c => c.name.toLowerCase()));
+        if (uniqueNames.size !== classesToCreate.length) {
+            throw new Error('Existem classes com nomes duplicados.');
+        }
         
         // 2. Adiciona classes com percentuais
-        for (const cls of selectedClasses) {
-            if (cls.percentage > 0) {
-                await fetch(`/asset-classes/?portfolio_id=${portfolio.id}`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        name: cls.name,
-                        target_percentage: cls.percentage,
-                        rebalance_threshold_percentage: 5.0
-                    })
-                });
+        for (const cls of classesToCreate) {
+            const classResp = await fetch(`/asset-classes/?portfolio_id=${portfolio.id}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    name: cls.name,
+                    target_percentage: cls.percentage,
+                    rebalance_threshold_percentage: 5.0,
+                    is_custom: cls.isCustom
+                })
+            });
+
+            if (!classResp.ok) {
+                const classErr = await classResp.json().catch(() => ({}));
+                throw new Error(classErr.detail || `Erro ao adicionar classe ${cls.name}`);
             }
         }
         

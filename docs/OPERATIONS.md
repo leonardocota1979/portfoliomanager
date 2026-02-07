@@ -14,6 +14,8 @@ pip install -r requirements.txt
 ## Variáveis de ambiente
 No `.env`:
 - `DATABASE_URL` (SQLite por padrão; pode apontar para Postgres)
+- `DB_SCHEMA` (schema do projeto no Postgres compartilhado)
+- `ENFORCE_DB_SCHEMA` (falha startup se schema ativo divergir)
 - `FINNHUB_KEY`
 - `ALPHAVANTAGE_KEY`
 - `OCR_LANG`
@@ -46,6 +48,11 @@ Variáveis principais (já no `render.yaml`):
 
 Para usar **Postgres no Render**, defina `DATABASE_URL` no painel do serviço
 (isso sobrescreve o valor do `render.yaml`).
+
+Configuração recomendada no Render (General-db compartilhado):
+- `DATABASE_URL` = **Internal Database URL** do `General-db`
+- `DB_SCHEMA=portfolio_manager`
+- `ENFORCE_DB_SCHEMA=true`
 
 Para um guia completo de produção, veja `docs/PRODUCTION.md`.
 

@@ -3,13 +3,32 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 
-from app.database import get_db, AssetClass as AssetClassModel, Portfolio as PortfolioModel
-from app.schemas import AssetClass, AssetClassCreate, AssetClassUpdate
+from app.database import (
+    get_db,
+    AssetClass as AssetClassModel,
+    Portfolio as PortfolioModel,
+    GlobalAssetClass as GlobalAssetClassModel,
+    User as UserModel,
+)
+from app.schemas import AssetClass, AssetClassCreate, AssetClassUpdate, GlobalAssetClass
+from app.dependencies import get_current_active_user
 
 router = APIRouter(
     prefix="/asset-classes",
     tags=["Asset Classes"]
 )
+
+
+@router.get("/global-classes", response_model=List[GlobalAssetClass])
+def list_global_asset_classes(
+    db: Session = Depends(get_db),
+    _: UserModel = Depends(get_current_active_user)
+):
+    """
+    Lista classes globais padrão para qualquer usuário autenticado.
+    Usado no setup de carteira (passo 2).
+    """
+    return db.query(GlobalAssetClassModel).order_by(GlobalAssetClassModel.name.asc()).all()
 
 # ==============================================================================
 # CREATE - Criar Asset Class
@@ -254,4 +273,3 @@ def delete_asset_class(
     db.commit()
 
     return None
-

@@ -27,6 +27,8 @@ Passo 1:
 
 Passo 2:
 - Escolher classes de ativos
+- Adicionar classes personalizadas com o nome que quiser
+- Remover classes não desejadas (desmarcando/removendo)
 - Definir % meta por classe (total = 100%)
 
 ## Importar Portfólio (OCR)
