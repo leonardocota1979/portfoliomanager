@@ -54,6 +54,27 @@ Configuração recomendada no Render (General-db compartilhado):
 - `DB_SCHEMA=portfolio_manager`
 - `ENFORCE_DB_SCHEMA=true`
 
+## Migração de dados (SQLite local -> Postgres Render)
+Pré-requisitos:
+- `venv` ativo
+- Postgres client opcional (não obrigatório para este script)
+- URL interna do Render (Internal Database URL do `General-db`)
+
+Comando:
+```bash
+python scripts/maintenance/migrate_sqlite_to_postgres.py \
+  --sqlite data/portfoliomanager.db \
+  --postgres-url "postgresql://USER:PASSWORD@HOST:5432/DBNAME" \
+  --schema portfolio_manager \
+  --truncate
+```
+
+Efeito:
+- cria schema `portfolio_manager` se não existir;
+- cria tabelas de destino;
+- limpa destino (`--truncate`) e carrega todos os registros;
+- valida contagem por tabela no final.
+
 Para um guia completo de produção, veja `docs/PRODUCTION.md`.
 
 ## Banco de dados

@@ -15,6 +15,7 @@ Arquivos principais:
 - `scripts/maintenance/housekeeping.sh`: limpeza segura de temporários (dry-run por padrão).
 - `scripts/maintenance/backup_postgres.sh`: backup de Postgres para `var/backups/postgres/`.
 - `scripts/maintenance/restore_postgres.sh`: restore de dump Postgres.
+- `scripts/maintenance/migrate_sqlite_to_postgres.py`: migra dados de `data/portfoliomanager.db` para Postgres (Render), com validação de contagem por tabela.
 
 ## `migrations/`
 Migrações pontuais em SQLite para compatibilidade retroativa.

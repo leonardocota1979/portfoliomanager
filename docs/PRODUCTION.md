@@ -59,6 +59,24 @@ Compatibilidade:
 - Se o provedor entregar `postgres://...`, o sistema normaliza automaticamente para `postgresql://...` via `app/core/settings.py`.
 - O startup valida schema ativo com `current_schema()` quando `ENFORCE_DB_SCHEMA=true`.
 
+### Migrar base atual (SQLite local -> Postgres Render)
+Execute na raiz do projeto:
+
+```bash
+source venv/bin/activate
+python scripts/maintenance/migrate_sqlite_to_postgres.py \
+  --sqlite data/portfoliomanager.db \
+  --postgres-url "postgresql://USER:PASSWORD@HOST:5432/DBNAME" \
+  --schema portfolio_manager \
+  --truncate
+```
+
+Após migração:
+1. No Render (serviço web), confirme `DATABASE_URL` apontando para o `General-db`.
+2. Garanta `DB_SCHEMA=portfolio_manager`.
+3. Garanta `ENFORCE_DB_SCHEMA=true`.
+4. Faça `Manual Deploy -> Deploy latest commit`.
+
 ### 4.1) Seed automático de classes globais
 No primeiro boot, o sistema cria classes globais padrão automaticamente
 (Stocks, Bonds, REITs, Crypto, Commodities, Reserva de Valor).
